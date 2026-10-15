@@ -1,0 +1,18 @@
+# .NET
+bin/
+obj/
+TestResults/
+*.user
+.vs/
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+coverage/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

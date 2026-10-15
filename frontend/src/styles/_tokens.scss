@@ -1,0 +1,34 @@
+// Design tokens as CSS custom properties: one place to theme the whole UI.
+:root {
+  --color-primary: #0050f0;
+  --color-primary-strong: #003cb4;
+  --color-text: #1a1f2b;
+  --color-text-muted: #5b6475;
+  --color-surface: #ffffff;
+  --color-background: #f4f6fa;
+  --color-border: #dde2eb;
+  --color-success: #12805c;
+  --color-success-soft: #e3f5ee;
+  --color-warning: #9a5b00;
+  --color-warning-soft: #fff3dc;
+  --color-danger: #c62828;
+  --color-danger-soft: #fdecec;
+
+  --font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', Menlo, monospace;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --radius: 0.5rem;
+  --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 10%);
+  --focus-ring: 0 0 0 3px rgb(0 80 240 / 35%);
+}
+
+// Breakpoints (mobile first: styles target small screens, these widen the layout).
+$bp-md: 48rem;
+$bp-lg: 64rem;

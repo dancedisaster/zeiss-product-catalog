@@ -1,0 +1,85 @@
+<section class="page page--narrow">
+  <a class="page__back" routerLink="/products">← Back to products</a>
+  <h1 class="page__title">{{ isEdit() ? 'Edit product' : 'New product' }}</h1>
+
+  @if (isEdit() && product.error()) {
+    <div class="state state--error" role="alert">
+      <p>This product could not be loaded. It may have been deleted.</p>
+      <a class="button button--primary" routerLink="/products">Back to products</a>
+    </div>
+  } @else if (isEdit() && product.isLoading()) {
+    <div class="state" role="status">Loading product…</div>
+  } @else {
+    <form class="form" [formRoot]="productForm">
+      <div class="field">
+        <label class="field__label" for="name">Name</label>
+        <input id="name" class="field__input" type="text" [formField]="productForm.name" aria-describedby="name-error" />
+        @if (productForm.name().touched() && productForm.name().invalid()) {
+          <p class="field__error" id="name-error">{{ productForm.name().errors()[0].message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="sku">SKU</label>
+        <input id="sku" class="field__input field__input--mono" type="text" [formField]="productForm.sku" aria-describedby="sku-error" />
+        @if (productForm.sku().touched() && productForm.sku().invalid()) {
+          <p class="field__error" id="sku-error">{{ productForm.sku().errors()[0].message }}</p>
+        }
+      </div>
+
+      <div class="form__row">
+        <div class="field">
+          <label class="field__label" for="price">Price (EUR)</label>
+          <input id="price" class="field__input" type="number" step="0.01" inputmode="decimal" [formField]="productForm.price" aria-describedby="price-error" />
+          @if (productForm.price().touched() && productForm.price().invalid()) {
+            <p class="field__error" id="price-error">{{ productForm.price().errors()[0].message }}</p>
+          }
+        </div>
+
+        @if (isEdit()) {
+          <div class="field">
+            <span class="field__label">Stock</span>
+            <p class="field__static">{{ model().stock }} units</p>
+            <p class="field__hint">Change stock with the − / + controls in the list.</p>
+          </div>
+        } @else {
+          <div class="field">
+            <label class="field__label" for="stock">Initial stock</label>
+            <input id="stock" class="field__input" type="number" step="1" inputmode="numeric" [formField]="productForm.stock" aria-describedby="stock-error" />
+            @if (productForm.stock().touched() && productForm.stock().invalid()) {
+              <p class="field__error" id="stock-error">{{ productForm.stock().errors()[0].message }}</p>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="category">Category</label>
+        <select id="category" class="field__input" [formField]="productForm.categoryId" aria-describedby="category-error">
+          <option value="">Choose…</option>
+          @for (category of categories.value(); track category.id) {
+            <option [value]="category.id">{{ category.name }}</option>
+          }
+        </select>
+        @if (productForm.categoryId().touched() && productForm.categoryId().invalid()) {
+          <p class="field__error" id="category-error">{{ productForm.categoryId().errors()[0].message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="description">Description <span class="field__optional">(optional)</span></label>
+        <textarea id="description" class="field__input" rows="4" [formField]="productForm.description" aria-describedby="description-error"></textarea>
+        @if (productForm.description().touched() && productForm.description().invalid()) {
+          <p class="field__error" id="description-error">{{ productForm.description().errors()[0].message }}</p>
+        }
+      </div>
+
+      <div class="form__actions">
+        <a class="button button--ghost" routerLink="/products">Cancel</a>
+        <button type="submit" class="button button--primary" [disabled]="productForm().submitting()">
+          {{ productForm().submitting() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create product' }}
+        </button>
+      </div>
+    </form>
+  }
+</section>

@@ -1,0 +1,37 @@
+### ZEISS Product Catalog API - quick manual checks (VS Code REST Client / Rider / Visual Studio)
+@api = http://localhost:5080/api
+
+GET {{api}}/products
+
+###
+GET {{api}}/products/100000
+
+###
+POST {{api}}/products
+Content-Type: application/json
+
+{ "name": "SmartLife Progressive 1.74", "description": "Ultra-thin", "sku": "LNS-SLP-174", "price": 349.00, "stock": 12, "categoryId": 1 }
+
+###
+PUT {{api}}/products/100000
+Content-Type: application/json
+
+{ "name": "SmartLife Progressive 1.60", "description": "Updated", "sku": "LNS-SLP-160", "price": 299.00, "categoryId": 1 }
+
+###
+POST {{api}}/products/100000/decrement-stock/5
+
+###
+POST {{api}}/products/100000/add-to-stock/10
+
+###
+GET {{api}}/products/search?name=smart
+
+###
+GET {{api}}/products/stock-level?min=0&max=10
+
+###
+DELETE {{api}}/products/100011
+
+###
+GET {{api}}/categories

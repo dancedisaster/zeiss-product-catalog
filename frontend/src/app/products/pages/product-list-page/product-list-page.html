@@ -1,0 +1,70 @@
+<section class="page">
+  <header class="page__header">
+    <div>
+      <h1 class="page__title">Products</h1>
+      @if (store.lastUpdated(); as updated) {
+        <p class="page__subtitle">Updated {{ updated | date: 'HH:mm:ss' }}</p>
+      }
+    </div>
+    <div class="page__actions">
+      <button type="button" class="button button--ghost" (click)="store.refresh()" [disabled]="store.status() === 'loading'">
+        Refresh
+      </button>
+      <a class="button button--primary" routerLink="/products/new">New product</a>
+    </div>
+  </header>
+
+  <dl class="kpis">
+    <div class="kpis__item">
+      <dt class="kpis__label">Products</dt>
+      <dd class="kpis__value">{{ store.summary().count }}</dd>
+    </div>
+    <div class="kpis__item">
+      <dt class="kpis__label">Units in stock</dt>
+      <dd class="kpis__value">{{ store.summary().units | number }}</dd>
+    </div>
+    <div class="kpis__item kpis__item--warning">
+      <dt class="kpis__label">Low stock</dt>
+      <dd class="kpis__value">{{ store.summary().lowStock }}</dd>
+    </div>
+    <div class="kpis__item kpis__item--danger">
+      <dt class="kpis__label">Out of stock</dt>
+      <dd class="kpis__value">{{ store.summary().outOfStock }}</dd>
+    </div>
+  </dl>
+
+  <app-product-filters
+    [filters]="store.filters()"
+    [active]="store.hasActiveFilters()"
+    (changed)="store.setFilters($event)"
+    (cleared)="store.clearFilters()"
+  />
+
+  <div class="page__content" [attr.aria-busy]="store.status() === 'loading'">
+    @if (store.status() === 'error' && store.products().length === 0) {
+      <div class="state state--error" role="alert">
+        <p>{{ store.error()?.message }}</p>
+        <button type="button" class="button button--primary" (click)="store.refresh()">Try again</button>
+      </div>
+    } @else if (store.status() === 'loading' && store.products().length === 0) {
+      <div class="state" role="status">Loading products…</div>
+    } @else if (store.products().length === 0) {
+      <div class="state" role="status">
+        @if (store.hasActiveFilters()) {
+          <p>No products match these filters.</p>
+          <button type="button" class="button button--ghost" (click)="store.clearFilters()">Clear filters</button>
+        } @else {
+          <p>No products yet.</p>
+          <a class="button button--primary" routerLink="/products/new">Create the first one</a>
+        }
+      </div>
+    } @else {
+      <app-product-list
+        [products]="store.products()"
+        [busyIds]="busyIds()"
+        (stockChange)="onStockChange($event)"
+        (delete)="onDelete($event)"
+      />
+    }
+  </div>
+</section>
