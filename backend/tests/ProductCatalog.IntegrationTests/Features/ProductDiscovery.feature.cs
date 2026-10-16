@@ -24,8 +24,8 @@ namespace ProductCatalog.IntegrationTests.Features
         
         private static string[] featureTags = ((string[])(null));
         
-        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Product discovery", "    As a shop user\n    I want to find products by name or by stock level\n    So t" +
-                "hat I can quickly see what can be sold and what needs restocking", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
+        private static global::Reqnroll.FeatureInfo featureInfo = new global::Reqnroll.FeatureInfo(new global::System.Globalization.CultureInfo("en-US"), "Features", "Product discovery", "    As a shop user\r\n    I want to find products by name or by stock level\r\n    So" +
+                " that I can quickly see what can be sold and what needs restocking", global::Reqnroll.ProgrammingLanguage.CSharp, featureTags, InitializeCucumberMessages());
         
         private global::Xunit.Abstractions.ITestOutputHelper _testOutputHelper;
         
