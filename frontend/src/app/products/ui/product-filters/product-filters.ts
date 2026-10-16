@@ -44,10 +44,20 @@ import { LOW_STOCK_THRESHOLD, ProductFilters as Filters } from '../../models/pro
         />
       </div>
       <div class="filters__chips" role="group" aria-label="Quick filters">
-        <button type="button" class="chip" (click)="changed.emit({ minStock: 1, maxStock: lowStock })">Low stock</button>
-        <button type="button" class="chip" (click)="changed.emit({ minStock: 0, maxStock: 0 })">Out of stock</button>
+        <button
+          type="button"
+          class="chip"
+          (click)="changed.emit({ minStock: 1, maxStock: lowStock })"
+        >
+          Low stock
+        </button>
+        <button type="button" class="chip" (click)="changed.emit({ minStock: 0, maxStock: 0 })">
+          Out of stock
+        </button>
         @if (active()) {
-          <button type="button" class="chip chip--clear" (click)="cleared.emit()">Clear filters</button>
+          <button type="button" class="chip chip--clear" (click)="cleared.emit()">
+            Clear filters
+          </button>
         }
       </div>
     </search>

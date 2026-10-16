@@ -1,0 +1,7 @@
+# Editor configuration, see https://editorconfig.org
+root = true
+
+[*]
+# The repository is LF-only (see /.gitattributes). Without this, dotnet format falls back to the
+# platform newline and reports CRLF/LF mismatches on Windows wherever it rewrites whitespace.
+end_of_line = lf

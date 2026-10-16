@@ -47,12 +47,27 @@ export class ProductsApi {
   }
 
   /** Name search; the optional stock range is applied on the server too, so paging stays correct. */
-  search(name: string, min: number | null, max: number | null, params: ListParams): Observable<ProductPage> {
-    return this.getPage(`${this.baseUrl}/search`, withStockRange(toHttpParams(params).set('name', name), min, max));
+  search(
+    name: string,
+    min: number | null,
+    max: number | null,
+    params: ListParams,
+  ): Observable<ProductPage> {
+    return this.getPage(
+      `${this.baseUrl}/search`,
+      withStockRange(toHttpParams(params).set('name', name), min, max),
+    );
   }
 
-  byStockLevel(min: number | null, max: number | null, params: ListParams): Observable<ProductPage> {
-    return this.getPage(`${this.baseUrl}/stock-level`, withStockRange(toHttpParams(params), min, max));
+  byStockLevel(
+    min: number | null,
+    max: number | null,
+    params: ListParams,
+  ): Observable<ProductPage> {
+    return this.getPage(
+      `${this.baseUrl}/stock-level`,
+      withStockRange(toHttpParams(params), min, max),
+    );
   }
 
   summary(): Observable<ProductSummary> {

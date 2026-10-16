@@ -12,7 +12,9 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
         [disabled]="busy() || !canRemove()"
         (click)="emit(-1)"
         [attr.aria-label]="'Remove ' + quantity() + ' from stock'"
-      >−</button>
+      >
+        −
+      </button>
       <input
         class="stock-adjuster__input"
         type="number"
@@ -28,7 +30,9 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
         [disabled]="busy() || !validQuantity()"
         (click)="emit(1)"
         [attr.aria-label]="'Add ' + quantity() + ' to stock'"
-      >+</button>
+      >
+        +
+      </button>
     </div>
   `,
 })
@@ -39,8 +43,12 @@ export class StockAdjuster {
   readonly changeStock = output<number>();
 
   protected readonly quantity = signal(1);
-  protected readonly validQuantity = computed(() => Number.isInteger(this.quantity()) && this.quantity() > 0);
-  protected readonly canRemove = computed(() => this.validQuantity() && this.quantity() <= this.stock());
+  protected readonly validQuantity = computed(
+    () => Number.isInteger(this.quantity()) && this.quantity() > 0,
+  );
+  protected readonly canRemove = computed(
+    () => this.validQuantity() && this.quantity() <= this.stock(),
+  );
 
   protected onQuantity(event: Event): void {
     this.quantity.set((event.target as HTMLInputElement).valueAsNumber);

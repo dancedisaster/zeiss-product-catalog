@@ -1,6 +1,17 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable, Subject, catchError, debounceTime, firstValueFrom, map, merge, of, switchMap, tap } from 'rxjs';
+import {
+  Observable,
+  Subject,
+  catchError,
+  debounceTime,
+  firstValueFrom,
+  map,
+  merge,
+  of,
+  switchMap,
+  tap,
+} from 'rxjs';
 import { ApiError, toApiError } from '../../core/http/api-error';
 import {
   CreateProductRequest,
@@ -52,7 +63,13 @@ export class ProductStore {
   private readonly typing$ = new Subject<void>();
   private readonly reload$ = new Subject<void>();
   private readonly summaryReload$ = new Subject<void>();
-  private readonly state = signal<ProductState>({ products: [], total: 0, status: 'loading', error: null, lastUpdated: null });
+  private readonly state = signal<ProductState>({
+    products: [],
+    total: 0,
+    status: 'loading',
+    error: null,
+    lastUpdated: null,
+  });
   private readonly pageState = signal(1);
   private readonly sortState = signal<ProductSort | null>(null);
   private readonly summaryState = signal<ProductSummary | null>(null);
@@ -80,7 +97,9 @@ export class ProductStore {
    * The last refresh of the page or of the summary failed, so what is on screen may be out of date.
    * (A failure with nothing to show yet is reported by the page's own error state instead.)
    */
-  readonly stale = computed(() => (this.status() === 'error' && this.products().length > 0) || this.summaryFailed());
+  readonly stale = computed(
+    () => (this.status() === 'error' && this.products().length > 0) || this.summaryFailed(),
+  );
 
   constructor() {
     merge(this.typing$.pipe(debounceTime(300)), this.reload$)
@@ -94,8 +113,16 @@ export class ProductStore {
         }),
         switchMap(({ filters, params }) =>
           this.query(filters, params).pipe(
-            map((page): ProductState => ({ products: page.items, total: page.total, status: 'loaded', error: null, lastUpdated: new Date() })),
-            catchError((error: unknown) => of<ProductState>({ ...this.state(), status: 'error', error: toApiError(error) })),
+            map((page): ProductState => ({
+              products: page.items,
+              total: page.total,
+              status: 'loaded',
+              error: null,
+              lastUpdated: new Date(),
+            })),
+            catchError((error: unknown) =>
+              of<ProductState>({ ...this.state(), status: 'error', error: toApiError(error) }),
+            ),
           ),
         ),
         takeUntilDestroyed(this.destroyRef),
@@ -181,7 +208,10 @@ export class ProductStore {
   }
 
   async changeStock(product: Product, delta: number): Promise<MutationResult<Product>> {
-    const request = delta > 0 ? this.api.addToStock(product.id, delta) : this.api.decrementStock(product.id, -delta);
+    const request =
+      delta > 0
+        ? this.api.addToStock(product.id, delta)
+        : this.api.decrementStock(product.id, -delta);
     const result = await this.run(request);
 
     if (result.ok) {
@@ -235,7 +265,9 @@ export class ProductStore {
     }
 
     const hasRange = filters.minStock !== null || filters.maxStock !== null;
-    return hasRange ? this.api.byStockLevel(filters.minStock, filters.maxStock, params) : this.api.list(params);
+    return hasRange
+      ? this.api.byStockLevel(filters.minStock, filters.maxStock, params)
+      : this.api.list(params);
   }
 
   private replace(product: Product): void {

@@ -23,10 +23,16 @@ export function toApiError(error: unknown): ApiError {
   }
 
   if (error.status === 0) {
-    return { status: 0, message: 'Cannot reach the server. Check your connection and try again.', fieldErrors: {} };
+    return {
+      status: 0,
+      message: 'Cannot reach the server. Check your connection and try again.',
+      fieldErrors: {},
+    };
   }
 
-  const problem = (typeof error.error === 'object' && error.error !== null ? error.error : {}) as ProblemDetails;
+  const problem = (
+    typeof error.error === 'object' && error.error !== null ? error.error : {}
+  ) as ProblemDetails;
   return {
     status: error.status,
     message: problem.detail ?? problem.title ?? `Request failed (${error.status}).`,

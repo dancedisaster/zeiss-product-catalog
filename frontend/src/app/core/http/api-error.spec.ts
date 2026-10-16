@@ -5,7 +5,12 @@ describe('toApiError', () => {
   it('reads detail, code and field errors from RFC 9457 problem details', () => {
     const error = new HttpErrorResponse({
       status: 400,
-      error: { title: 'Validation failed', detail: 'One or more validation errors occurred.', code: 'validation_failed', errors: { sku: ['Invalid'] } },
+      error: {
+        title: 'Validation failed',
+        detail: 'One or more validation errors occurred.',
+        code: 'validation_failed',
+        errors: { sku: ['Invalid'] },
+      },
     });
 
     expect(toApiError(error)).toEqual({

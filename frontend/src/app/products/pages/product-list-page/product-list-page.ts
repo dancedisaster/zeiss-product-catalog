@@ -28,7 +28,9 @@ export class ProductListPage {
 
     // Reflect changes made by others through the API: refresh when the tab becomes visible again
     // and periodically while it is visible. (Server push with SignalR would be the next step.)
-    const becameVisible$ = fromEvent(document, 'visibilitychange').pipe(filter(() => !document.hidden));
+    const becameVisible$ = fromEvent(document, 'visibilitychange').pipe(
+      filter(() => !document.hidden),
+    );
     const tick$ = interval(AUTO_REFRESH_MS).pipe(filter(() => !document.hidden));
     merge(becameVisible$, tick$)
       .pipe(takeUntilDestroyed(inject(DestroyRef)))
@@ -42,7 +44,9 @@ export class ProductListPage {
 
     if (result.ok) {
       const verb = delta > 0 ? 'Added' : 'Removed';
-      this.notifications.success(`${verb} ${Math.abs(delta)} · ${product.name} now has ${result.value.stock} in stock.`);
+      this.notifications.success(
+        `${verb} ${Math.abs(delta)} · ${product.name} now has ${result.value.stock} in stock.`,
+      );
     } else {
       this.notifications.error(result.error.message);
     }

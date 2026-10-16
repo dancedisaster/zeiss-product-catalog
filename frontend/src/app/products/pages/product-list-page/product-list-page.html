@@ -7,7 +7,12 @@
       }
     </div>
     <div class="page__actions">
-      <button type="button" class="button button--ghost" (click)="store.refresh()" [disabled]="store.status() === 'loading'">
+      <button
+        type="button"
+        class="button button--ghost"
+        (click)="store.refresh()"
+        [disabled]="store.status() === 'loading'"
+      >
         Refresh
       </button>
       <a class="button button--primary" routerLink="/products/new">New product</a>
@@ -52,7 +57,9 @@
           Last successful update at {{ updated | date: 'HH:mm:ss' }}.
         }
       </p>
-      <button type="button" class="button button--ghost" (click)="store.refresh()">Try again</button>
+      <button type="button" class="button button--ghost" (click)="store.refresh()">
+        Try again
+      </button>
     </div>
   }
 
@@ -60,7 +67,9 @@
     @if (store.status() === 'error' && store.products().length === 0) {
       <div class="state state--error" role="alert">
         <p>{{ store.error()?.message }}</p>
-        <button type="button" class="button button--primary" (click)="store.refresh()">Try again</button>
+        <button type="button" class="button button--primary" (click)="store.refresh()">
+          Try again
+        </button>
       </div>
     } @else if (store.status() === 'loading' && store.products().length === 0) {
       <div class="state" role="status">Loading products…</div>
@@ -68,7 +77,9 @@
       <div class="state" role="status">
         @if (store.hasActiveFilters()) {
           <p>No products match these filters.</p>
-          <button type="button" class="button button--ghost" (click)="store.clearFilters()">Clear filters</button>
+          <button type="button" class="button button--ghost" (click)="store.clearFilters()">
+            Clear filters
+          </button>
         } @else {
           <p>No products yet.</p>
           <a class="button button--primary" routerLink="/products/new">Create the first one</a>
@@ -83,7 +94,12 @@
         (delete)="onDelete($event)"
         (sortChange)="store.setSort($event)"
       />
-      <app-paginator [page]="store.page()" [pageSize]="store.pageSize" [total]="store.total()" (pageChange)="store.goToPage($event)" />
+      <app-paginator
+        [page]="store.page()"
+        [pageSize]="store.pageSize"
+        [total]="store.total()"
+        (pageChange)="store.goToPage($event)"
+      />
     }
   </div>
 </section>

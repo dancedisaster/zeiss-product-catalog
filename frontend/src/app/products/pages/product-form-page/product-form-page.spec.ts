@@ -28,7 +28,11 @@ describe('ProductFormPage (edit)', () => {
 
   beforeEach(async () => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([{ path: 'products', children: [] }])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([{ path: 'products', children: [] }]),
+      ],
     });
     http = TestBed.inject(HttpTestingController);
 
@@ -44,7 +48,9 @@ describe('ProductFormPage (edit)', () => {
   afterEach(() => http.verify());
 
   async function submit(): Promise<void> {
-    (fixture.nativeElement as HTMLElement).querySelector('form')!.dispatchEvent(new Event('submit'));
+    (fixture.nativeElement as HTMLElement)
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit'));
     await settle();
   }
 
@@ -67,12 +73,13 @@ describe('ProductFormPage (edit)', () => {
 
   it('explains a conflict and can load the version someone else saved', async () => {
     await submit();
-    http
-      .expectOne({ method: 'PUT', url: `/api/products/${loaded.id}` })
-      .flush(
-        { code: 'product.concurrent_update', detail: 'Product 100001 was changed by someone else.' },
-        { status: 409, statusText: 'Conflict' },
-      );
+    http.expectOne({ method: 'PUT', url: `/api/products/${loaded.id}` }).flush(
+      {
+        code: 'product.concurrent_update',
+        detail: 'Product 100001 was changed by someone else.',
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
     await settle();
     fixture.detectChanges();
 
@@ -80,11 +87,15 @@ describe('ProductFormPage (edit)', () => {
 
     alert()!.querySelector('button')!.click();
     TestBed.tick();
-    http.expectOne(`/api/products/${loaded.id}`).flush({ ...loaded, name: 'Renamed by someone else', version: 'version-other' });
+    http
+      .expectOne(`/api/products/${loaded.id}`)
+      .flush({ ...loaded, name: 'Renamed by someone else', version: 'version-other' });
     await settle();
     fixture.detectChanges();
 
     expect(alert()).toBeNull();
-    expect((fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#name')!.value).toBe('Renamed by someone else');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#name')!.value,
+    ).toBe('Renamed by someone else');
   });
 });

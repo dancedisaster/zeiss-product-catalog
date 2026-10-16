@@ -1,0 +1,2 @@
+# Check out text files with LF on every platform, matching what Prettier and dotnet format expect.
+* text=auto eol=lf

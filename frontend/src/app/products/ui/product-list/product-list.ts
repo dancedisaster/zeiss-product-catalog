@@ -10,12 +10,13 @@ export interface StockChange {
   delta: number;
 }
 
-const SORTABLE_COLUMNS: readonly { column: ProductSortColumn; label: string; numeric?: boolean }[] = [
-  { column: 'name', label: 'Product' },
-  { column: 'categoryName', label: 'Category' },
-  { column: 'price', label: 'Price', numeric: true },
-  { column: 'stock', label: 'Stock' },
-];
+const SORTABLE_COLUMNS: readonly { column: ProductSortColumn; label: string; numeric?: boolean }[] =
+  [
+    { column: 'name', label: 'Product' },
+    { column: 'categoryName', label: 'Category' },
+    { column: 'price', label: 'Price', numeric: true },
+    { column: 'stock', label: 'Stock' },
+  ];
 
 /** Choices for the small-screen "Sort by" menu, where the column headers are hidden. */
 const SORT_OPTIONS: readonly { value: string; label: string }[] = [
@@ -40,10 +41,16 @@ const SORT_OPTIONS: readonly { value: string; label: string }[] = [
   template: `
     <div class="product-sort">
       <label class="product-sort__label" for="product-sort">Sort by</label>
-      <select id="product-sort" class="filters__input product-sort__select" (change)="onSortSelected($event)">
+      <select
+        id="product-sort"
+        class="filters__input product-sort__select"
+        (change)="onSortSelected($event)"
+      >
         <option value="" [selected]="sortValue() === ''">Default</option>
         @for (option of sortOptions; track option.value) {
-          <option [value]="option.value" [selected]="sortValue() === option.value">{{ option.label }}</option>
+          <option [value]="option.value" [selected]="sortValue() === option.value">
+            {{ option.label }}
+          </option>
         }
       </select>
     </div>
@@ -51,10 +58,18 @@ const SORT_OPTIONS: readonly { value: string; label: string }[] = [
     <div class="product-list" role="table" aria-label="Products">
       <div class="product-list__head" role="row">
         @for (header of sortableColumns; track header.column) {
-          <span role="columnheader" [class.product-list__numeric]="header.numeric" [attr.aria-sort]="ariaSort(header.column)">
+          <span
+            role="columnheader"
+            [class.product-list__numeric]="header.numeric"
+            [attr.aria-sort]="ariaSort(header.column)"
+          >
             <button type="button" class="product-list__sort-button" (click)="sortBy(header.column)">
               {{ header.label }}
-              <span class="product-list__sort-icon" [class.product-list__sort-icon--active]="sort()?.column === header.column" aria-hidden="true">
+              <span
+                class="product-list__sort-icon"
+                [class.product-list__sort-icon--active]="sort()?.column === header.column"
+                aria-hidden="true"
+              >
                 {{ sortIcon(header.column) }}
               </span>
             </button>
@@ -64,14 +79,22 @@ const SORT_OPTIONS: readonly { value: string; label: string }[] = [
         <span role="columnheader"><span class="visually-hidden">Actions</span></span>
       </div>
       @for (product of products(); track product.id) {
-        <div class="product-list__row" role="row" [class.product-list__row--busy]="busyIds().has(product.id)">
+        <div
+          class="product-list__row"
+          role="row"
+          [class.product-list__row--busy]="busyIds().has(product.id)"
+        >
           <div class="product-list__cell product-list__cell--name" role="cell">
             <span class="product-list__name">{{ product.name }}</span>
             <span class="product-list__meta">#{{ product.id }} · {{ product.sku }}</span>
           </div>
           <div class="product-list__cell" role="cell">{{ product.categoryName }}</div>
-          <div class="product-list__cell product-list__numeric" role="cell">{{ product.price | currency: 'EUR' }}</div>
-          <div class="product-list__cell" role="cell"><app-stock-badge [stock]="product.stock" /></div>
+          <div class="product-list__cell product-list__numeric" role="cell">
+            {{ product.price | currency: 'EUR' }}
+          </div>
+          <div class="product-list__cell" role="cell">
+            <app-stock-badge [stock]="product.stock" />
+          </div>
           <div class="product-list__cell" role="cell">
             <app-stock-adjuster
               [stock]="product.stock"
@@ -81,12 +104,22 @@ const SORT_OPTIONS: readonly { value: string; label: string }[] = [
             />
           </div>
           <div class="product-list__cell product-list__actions" role="cell">
-            <a class="button button--ghost" [routerLink]="['/products', product.id, 'edit']">Edit</a>
+            <a class="button button--ghost" [routerLink]="['/products', product.id, 'edit']"
+              >Edit</a
+            >
             @if (confirmingId() === product.id) {
-              <button type="button" class="button button--danger" (click)="confirmDelete(product)">Confirm</button>
-              <button type="button" class="button button--ghost" (click)="confirmingId.set(null)">Cancel</button>
+              <button type="button" class="button button--danger" (click)="confirmDelete(product)">
+                Confirm
+              </button>
+              <button type="button" class="button button--ghost" (click)="confirmingId.set(null)">
+                Cancel
+              </button>
             } @else {
-              <button type="button" class="button button--ghost button--danger-text" (click)="confirmingId.set(product.id)">
+              <button
+                type="button"
+                class="button button--ghost button--danger-text"
+                (click)="confirmingId.set(product.id)"
+              >
                 Delete
               </button>
             }

@@ -22,14 +22,18 @@ const summary: ProductSummary = { productCount: 1, unitsInStock: 10, lowStock: 1
 
 describe('ProductListPage', () => {
   it('warns that the data may be out of date when a refresh fails, keeps it visible, and can try again', () => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])] });
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
     const http = TestBed.inject(HttpTestingController);
     const fixture = TestBed.createComponent(ProductListPage);
     const page = fixture.nativeElement as HTMLElement;
     const notice = () => page.querySelector('.notice');
     const answer = () => {
       http.expectOne('/api/products/summary').flush(summary);
-      http.expectOne((r) => r.url === '/api/products').flush([product], { headers: { 'X-Total-Count': '1' } });
+      http
+        .expectOne((r) => r.url === '/api/products')
+        .flush([product], { headers: { 'X-Total-Count': '1' } });
       fixture.detectChanges();
     };
 

@@ -30,7 +30,9 @@ describe('ProductList sorting', () => {
   }
 
   const header = (element: HTMLElement, label: string) =>
-    [...element.querySelectorAll<HTMLElement>('[role="columnheader"]')].find((h) => h.textContent?.includes(label))!;
+    [...element.querySelectorAll<HTMLElement>('[role="columnheader"]')].find((h) =>
+      h.textContent?.includes(label),
+    )!;
 
   it('sorts a new column ascending first', () => {
     const { element, emitted } = render(null);

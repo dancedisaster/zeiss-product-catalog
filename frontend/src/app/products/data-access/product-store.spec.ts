@@ -1,5 +1,9 @@
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  TestRequest,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Product, ProductSummary } from '../models/product';
 import { PAGE_SIZE, ProductStore } from './product-store';
@@ -19,7 +23,12 @@ const product = (overrides: Partial<Product> = {}): Product => ({
   ...overrides,
 });
 
-const summary: ProductSummary = { productCount: 12, unitsInStock: 3423, lowStock: 2, outOfStock: 1 };
+const summary: ProductSummary = {
+  productCount: 12,
+  unitsInStock: 3423,
+  lowStock: 2,
+  outOfStock: 1,
+};
 
 /** Lets the debounced filter input (300 ms) settle. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 350));
@@ -40,7 +49,9 @@ describe('ProductStore', () => {
   }
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
     store = TestBed.inject(ProductStore);
     http = TestBed.inject(HttpTestingController);
 
@@ -116,7 +127,9 @@ describe('ProductStore', () => {
   it('replaces a product with the server response after a stock change and refreshes the summary', async () => {
     const pending = store.changeStock(store.products()[0], -3);
 
-    http.expectOne({ method: 'POST', url: '/api/products/100001/decrement-stock/3' }).flush(product({ stock: 7 }));
+    http
+      .expectOne({ method: 'POST', url: '/api/products/100001/decrement-stock/3' })
+      .flush(product({ stock: 7 }));
     const result = await pending;
     http.expectOne('/api/products/summary').flush({ ...summary, unitsInStock: 3420 });
 
@@ -131,7 +144,9 @@ describe('ProductStore', () => {
     respond('/api/products/stock-level', [product({ stock: 0 })], 1);
 
     const pending = store.changeStock(store.products()[0], +1);
-    http.expectOne({ method: 'POST', url: '/api/products/100001/add-to-stock/1' }).flush(product({ stock: 1 }));
+    http
+      .expectOne({ method: 'POST', url: '/api/products/100001/add-to-stock/1' })
+      .flush(product({ stock: 1 }));
     await pending;
     respond('/api/products/stock-level', [], 0);
 
@@ -144,10 +159,14 @@ describe('ProductStore', () => {
     respond('/api/products', [product({ stock: 10 })], 12);
 
     const pending = store.changeStock(store.products()[0], -3);
-    http.expectOne({ method: 'POST', url: '/api/products/100001/decrement-stock/3' }).flush(product({ stock: 7 }));
+    http
+      .expectOne({ method: 'POST', url: '/api/products/100001/decrement-stock/3' })
+      .flush(product({ stock: 7 }));
     await pending;
 
-    expect(respond('/api/products', [product({ stock: 7 })], 12).request.params.get('sortBy')).toBe('stock');
+    expect(respond('/api/products', [product({ stock: 7 })], 12).request.params.get('sortBy')).toBe(
+      'stock',
+    );
   });
 
   it('keeps the last page on screen when a refresh fails, but flags it as possibly out of date', () => {
@@ -155,7 +174,9 @@ describe('ProductStore', () => {
 
     store.refresh();
     http.expectOne('/api/products/summary').flush(summary);
-    http.expectOne((r) => r.url === '/api/products').flush({ detail: 'Server error' }, { status: 500, statusText: 'Server Error' });
+    http
+      .expectOne((r) => r.url === '/api/products')
+      .flush({ detail: 'Server error' }, { status: 500, statusText: 'Server Error' });
 
     expect(store.products().length).toBe(2);
     expect(store.stale()).toBe(true);
@@ -167,8 +188,12 @@ describe('ProductStore', () => {
 
   it('flags the figures as possibly out of date when only the summary fails, and keeps the last ones', () => {
     store.refresh();
-    http.expectOne('/api/products/summary').flush(null, { status: 503, statusText: 'Service Unavailable' });
-    http.expectOne((r) => r.url === '/api/products').flush([product()], { headers: { 'X-Total-Count': '12' } });
+    http
+      .expectOne('/api/products/summary')
+      .flush(null, { status: 503, statusText: 'Service Unavailable' });
+    http
+      .expectOne((r) => r.url === '/api/products')
+      .flush([product()], { headers: { 'X-Total-Count': '12' } });
 
     expect(store.summary()).toEqual(summary);
     expect(store.stale()).toBe(true);
@@ -182,7 +207,9 @@ describe('ProductStore', () => {
 
     // Meanwhile the decrement is confirmed: 10 -> 7.
     const pending = store.changeStock(store.products()[0], -3);
-    http.expectOne({ method: 'POST', url: '/api/products/100001/decrement-stock/3' }).flush(product({ stock: 7 }));
+    http
+      .expectOne({ method: 'POST', url: '/api/products/100001/decrement-stock/3' })
+      .flush(product({ stock: 7 }));
     await pending;
 
     expect(store.products()[0].stock).toBe(7);
@@ -196,8 +223,17 @@ describe('ProductStore', () => {
     http.expectOne('/api/products/summary').flush(summary);
     const slowList = http.expectOne((r) => r.url === '/api/products');
 
-    const pending = store.update(100001, { name: 'Renamed', description: null, sku: 'LNS-1', price: 289, categoryId: 1, version: 'v1' });
-    http.expectOne({ method: 'PUT', url: '/api/products/100001' }).flush(product({ name: 'Renamed' }));
+    const pending = store.update(100001, {
+      name: 'Renamed',
+      description: null,
+      sku: 'LNS-1',
+      price: 289,
+      categoryId: 1,
+      version: 'v1',
+    });
+    http
+      .expectOne({ method: 'PUT', url: '/api/products/100001' })
+      .flush(product({ name: 'Renamed' }));
     await pending;
 
     expect(slowList.cancelled).toBe(true);
@@ -210,7 +246,9 @@ describe('ProductStore', () => {
     const pending = store.remove(target);
     expect(store.products().some((p) => p.id === target.id)).toBe(false);
 
-    http.expectOne({ method: 'DELETE', url: '/api/products/100001' }).flush(null, { status: 204, statusText: 'No Content' });
+    http
+      .expectOne({ method: 'DELETE', url: '/api/products/100001' })
+      .flush(null, { status: 204, statusText: 'No Content' });
     await pending;
     respond('/api/products', [product({ id: 100002 }), product({ id: 100003 })], 11);
 
@@ -221,10 +259,9 @@ describe('ProductStore', () => {
     const target = store.products()[0];
     const pending = store.remove(target);
 
-    http.expectOne({ method: 'DELETE', url: '/api/products/100001' }).flush(
-      { detail: 'Server error' },
-      { status: 500, statusText: 'Server Error' },
-    );
+    http
+      .expectOne({ method: 'DELETE', url: '/api/products/100001' })
+      .flush({ detail: 'Server error' }, { status: 500, statusText: 'Server Error' });
     const result = await pending;
 
     expect(result.ok).toBe(false);

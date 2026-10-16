@@ -12,7 +12,8 @@ describe('Paginator', () => {
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
-    const button = (label: string) => [...element.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!;
+    const button = (label: string) =>
+      [...element.querySelectorAll('button')].find((b) => b.textContent?.trim() === label)!;
     const summary = () => element.querySelector('.paginator__summary')?.textContent?.trim();
     return { element, emitted, button, summary };
   }
