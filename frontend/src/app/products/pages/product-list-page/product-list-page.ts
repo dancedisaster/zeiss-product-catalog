@@ -6,6 +6,7 @@ import { filter, fromEvent, interval, merge } from 'rxjs';
 import { NotificationService } from '../../../core/notifications/notification.service';
 import { ProductStore } from '../../data-access/product-store';
 import { Product } from '../../models/product';
+import { Paginator } from '../../ui/paginator/paginator';
 import { ProductFilters } from '../../ui/product-filters/product-filters';
 import { ProductList, StockChange } from '../../ui/product-list/product-list';
 
@@ -13,7 +14,7 @@ const AUTO_REFRESH_MS = 30_000;
 
 @Component({
   selector: 'app-product-list-page',
-  imports: [DatePipe, DecimalPipe, RouterLink, ProductFilters, ProductList],
+  imports: [DatePipe, DecimalPipe, RouterLink, Paginator, ProductFilters, ProductList],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-list-page.html',
 })

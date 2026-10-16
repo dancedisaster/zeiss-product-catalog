@@ -74,6 +74,13 @@
         }
       </div>
 
+      @if (conflict()) {
+        <div class="state state--error" role="alert">
+          <p>Someone else saved this product while you were editing it, so your changes were not saved.</p>
+          <button type="button" class="button button--primary" (click)="loadLatest()">Load the latest version</button>
+        </div>
+      }
+
       <div class="form__actions">
         <a class="button button--ghost" routerLink="/products">Cancel</a>
         <button type="submit" class="button button--primary" [disabled]="productForm().submitting()">

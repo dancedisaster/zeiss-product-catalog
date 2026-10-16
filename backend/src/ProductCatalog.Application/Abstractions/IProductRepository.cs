@@ -1,3 +1,4 @@
+using ProductCatalog.Application.Products;
 using ProductCatalog.Domain.Products;
 
 namespace ProductCatalog.Application.Abstractions;
@@ -7,11 +8,14 @@ public interface IProductRepository
     /// <summary>Loads a product for modification (tracked), including its category.</summary>
     Task<Product?> GetByIdAsync(int id, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<Product>> ListAsync(CancellationToken cancellationToken);
+    /// <summary>
+    /// Products matching <paramref name="filter"/> in the given order, with their category.
+    /// Without <paramref name="page"/> every match is returned.
+    /// </summary>
+    Task<ProductQueryResult> QueryAsync(ProductFilter filter, ProductOrder order, PageRequest? page, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<Product>> SearchByNameAsync(string name, CancellationToken cancellationToken);
-
-    Task<IReadOnlyList<Product>> ListByStockRangeAsync(int min, int max, CancellationToken cancellationToken);
+    /// <summary>Catalogue-wide counts for the dashboard, computed by the database in one query.</summary>
+    Task<ProductSummary> GetSummaryAsync(CancellationToken cancellationToken);
 
     Task<bool> SkuExistsAsync(string sku, int? excludingProductId, CancellationToken cancellationToken);
 

@@ -14,22 +14,24 @@
     </div>
   </header>
 
+  <!-- Catalogue-wide figures from the API; they don't change with the filters or the page. -->
+  @let summary = store.summary();
   <dl class="kpis">
     <div class="kpis__item">
       <dt class="kpis__label">Products</dt>
-      <dd class="kpis__value">{{ store.summary().count }}</dd>
+      <dd class="kpis__value">{{ summary ? summary.productCount : '–' }}</dd>
     </div>
     <div class="kpis__item">
       <dt class="kpis__label">Units in stock</dt>
-      <dd class="kpis__value">{{ store.summary().units | number }}</dd>
+      <dd class="kpis__value">{{ summary ? (summary.unitsInStock | number) : '–' }}</dd>
     </div>
     <div class="kpis__item kpis__item--warning">
       <dt class="kpis__label">Low stock</dt>
-      <dd class="kpis__value">{{ store.summary().lowStock }}</dd>
+      <dd class="kpis__value">{{ summary ? summary.lowStock : '–' }}</dd>
     </div>
     <div class="kpis__item kpis__item--danger">
       <dt class="kpis__label">Out of stock</dt>
-      <dd class="kpis__value">{{ store.summary().outOfStock }}</dd>
+      <dd class="kpis__value">{{ summary ? summary.outOfStock : '–' }}</dd>
     </div>
   </dl>
 
@@ -39,6 +41,20 @@
     (changed)="store.setFilters($event)"
     (cleared)="store.clearFilters()"
   />
+
+  <!-- A failed refresh keeps the last data on screen, but never passes it off as current. -->
+  @if (store.stale()) {
+    <div class="notice" role="alert">
+      <p class="notice__text">
+        <strong>This may be out of date.</strong>
+        {{ store.error()?.message ?? 'The summary figures could not be refreshed.' }}
+        @if (store.lastUpdated(); as updated) {
+          Last successful update at {{ updated | date: 'HH:mm:ss' }}.
+        }
+      </p>
+      <button type="button" class="button button--ghost" (click)="store.refresh()">Try again</button>
+    </div>
+  }
 
   <div class="page__content" [attr.aria-busy]="store.status() === 'loading'">
     @if (store.status() === 'error' && store.products().length === 0) {
@@ -62,9 +78,12 @@
       <app-product-list
         [products]="store.products()"
         [busyIds]="busyIds()"
+        [sort]="store.sort()"
         (stockChange)="onStockChange($event)"
         (delete)="onDelete($event)"
+        (sortChange)="store.setSort($event)"
       />
+      <app-paginator [page]="store.page()" [pageSize]="store.pageSize" [total]="store.total()" (pageChange)="store.goToPage($event)" />
     }
   </div>
 </section>

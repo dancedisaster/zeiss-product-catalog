@@ -7,12 +7,15 @@ public sealed class CreateProductRequestValidator : AbstractValidator<CreateProd
 {
     public CreateProductRequestValidator()
     {
-        RuleFor(x => x.Name).NotEmpty().MaximumLength(Product.NameMaxLength);
+        // One message per field: a missing value is reported as required, not also as badly formatted.
+        RuleLevelCascadeMode = CascadeMode.Stop;
+
+        RuleFor(x => x.Name).Required().MaximumLength(Product.NameMaxLength);
         RuleFor(x => x.Description).MaximumLength(Product.DescriptionMaxLength);
         RuleFor(x => x.Sku).ValidSku();
-        RuleFor(x => x.Price).ValidPrice();
-        RuleFor(x => x.Stock).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.CategoryId).GreaterThan(0);
+        RuleFor(x => x.Price).Required().ValidPrice();
+        RuleFor(x => x.Stock).Required().GreaterThanOrEqualTo(0);
+        RuleFor(x => x.CategoryId).Required().GreaterThan(0);
     }
 }
 
@@ -20,24 +23,35 @@ public sealed class UpdateProductRequestValidator : AbstractValidator<UpdateProd
 {
     public UpdateProductRequestValidator()
     {
-        RuleFor(x => x.Name).NotEmpty().MaximumLength(Product.NameMaxLength);
+        RuleLevelCascadeMode = CascadeMode.Stop;
+
+        RuleFor(x => x.Name).Required().MaximumLength(Product.NameMaxLength);
         RuleFor(x => x.Description).MaximumLength(Product.DescriptionMaxLength);
         RuleFor(x => x.Sku).ValidSku();
-        RuleFor(x => x.Price).ValidPrice();
-        RuleFor(x => x.CategoryId).GreaterThan(0);
+        RuleFor(x => x.Price).Required().ValidPrice();
+        RuleFor(x => x.CategoryId).Required().GreaterThan(0);
+        RuleFor(x => x.Version).NotEmpty().WithMessage(ProductRuleExtensions.RequiredMessage);
     }
 }
 
 internal static class ProductRuleExtensions
 {
     public const decimal MaxPrice = 1_000_000m;
+    public const string RequiredMessage = "'{PropertyName}' is required.";
+
+    public static IRuleBuilderOptions<T, string> Required<T>(this IRuleBuilder<T, string> rule)
+        => rule.NotEmpty().WithMessage(RequiredMessage);
+
+    public static IRuleBuilderOptions<T, TValue?> Required<T, TValue>(this IRuleBuilder<T, TValue?> rule)
+        where TValue : struct
+        => rule.NotNull().WithMessage(RequiredMessage);
 
     public static IRuleBuilderOptions<T, string> ValidSku<T>(this IRuleBuilder<T, string> rule)
-        => rule.NotEmpty()
+        => rule.Required()
             .MaximumLength(Product.SkuMaxLength)
             .Matches("^[A-Za-z0-9-]+$").WithMessage("SKU may only contain letters, digits and dashes.");
 
-    public static IRuleBuilderOptions<T, decimal> ValidPrice<T>(this IRuleBuilder<T, decimal> rule)
+    public static IRuleBuilderOptions<T, decimal?> ValidPrice<T>(this IRuleBuilder<T, decimal?> rule)
         => rule.GreaterThan(0)
             .LessThanOrEqualTo(MaxPrice)
             .PrecisionScale(18, 2, ignoreTrailingZeros: true);

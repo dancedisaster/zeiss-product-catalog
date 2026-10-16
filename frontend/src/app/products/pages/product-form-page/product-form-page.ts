@@ -1,10 +1,10 @@
 import { httpResource } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal, signal } from '@angular/core';
 import { FormField, FormRoot, form, max, maxLength, min, pattern, required, schema } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
 import { NotificationService } from '../../../core/notifications/notification.service';
 import { ProductStore } from '../../data-access/product-store';
-import { Category, CreateProductRequest, Product } from '../../models/product';
+import { Category, Product } from '../../models/product';
 
 interface ProductFormModel {
   name: string;
@@ -65,25 +65,35 @@ export class ProductFormPage {
       : EMPTY_MODEL;
   });
 
+  /** Set when someone else saved this product after it was loaded here. */
+  protected readonly conflict = signal(false);
+
   protected readonly productForm = form(this.model, productSchema, {
     submission: {
       action: async (field) => {
         const value = field().value();
-        const request: CreateProductRequest = {
+        const details = {
           name: value.name.trim(),
           description: value.description.trim() || null,
           sku: value.sku.trim(),
           price: value.price,
-          stock: value.stock,
           categoryId: Number(value.categoryId),
         };
 
+        // In edit mode the form is only shown once the product has loaded, so its version is known.
         const id = this.id();
-        const result = id ? await this.store.update(Number(id), request) : await this.store.create(request);
+        const result = id
+          ? await this.store.update(Number(id), { ...details, version: this.product.value()!.version })
+          : await this.store.create({ ...details, stock: value.stock });
 
         if (result.ok) {
           this.notifications.success(`${result.value.name} saved (#${result.value.id}).`);
           await this.router.navigate(['/products']);
+          return undefined;
+        }
+
+        if (result.error.code === 'product.concurrent_update') {
+          this.conflict.set(true);
           return undefined;
         }
 
@@ -107,4 +117,10 @@ export class ProductFormPage {
       },
     },
   });
+
+  /** Replaces the form with what is saved now; the user re-applies their change on top of it. */
+  protected loadLatest(): void {
+    this.conflict.set(false);
+    this.product.reload();
+  }
 }
