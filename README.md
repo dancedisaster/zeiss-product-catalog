@@ -167,6 +167,22 @@ The full reasoning is in [docs/DECISIONS.md](docs/DECISIONS.md). In short:
 - Authentication is out of scope for the assignment; see "Next steps".
 - With 900,000 possible ids the sequence is finite by design; the API fails clearly (500 + log) when it is exhausted.
 
+## How this was built
+
+I used an AI coding assistant, Claude Code, throughout: for the first implementation, to review it against the
+assignment, and for the fixes, features and tests that followed. The `Co-Authored-By` lines in the commit history show
+where.
+
+My part was to steer and check the work:
+
+- **Scope and trade-offs.** I decided what to build, which review findings to fix and what to leave out, such as
+  authentication and bulk actions, and why. The reasoning is in [docs/DECISIONS.md](docs/DECISIONS.md).
+- **Verification.** Every change comes with tests: unit tests, integration tests against a real SQL Server, BDD
+  scenarios and Angular tests. Reported bugs were first reproduced with a failing test, then fixed. I ran the
+  application locally (Docker, and against SQL Server Express), and the quick start was checked from a clean clone.
+- **Changes in small steps.** After the first version, changes went through pull requests, so the history shows how
+  the project evolved.
+
 ## Next steps (with more time)
 
 - Authentication/authorisation with Microsoft Entra ID (JWT bearer) and role-based policies (e.g. only warehouse roles change stock).
