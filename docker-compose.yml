@@ -1,5 +1,6 @@
 # Local environment: SQL Server + API + Angular (nginx). Run: docker compose up --build
 # Then open http://localhost:4200 (UI) and http://localhost:5080/scalar (API reference).
+# A host port already taken? Override it, e.g. UI_PORT=4300 API_PORT=5090 SQLSERVER_PORT=14331 docker compose up --build
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -7,7 +8,10 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Dev_Passw0rd!}
     ports:
-      - "1433:1433"
+      # The stack itself reaches SQL Server over the Docker network; this port is only for running the API on the
+      # host (README, "Running locally") and for looking at the data with SSMS. Not 1433: a SQL Server installed on
+      # the machine usually holds that port already, and the container could not start.
+      - "${SQLSERVER_PORT:-14330}:1433"
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' || exit 1"]
       interval: 5s
@@ -26,7 +30,7 @@ services:
       # Only nginx (fixed address below) may tell the API who the client is via X-Forwarded-For.
       ForwardedHeaders__KnownProxies__0: "172.28.10.10"
     ports:
-      - "5080:8080"
+      - "${API_PORT:-5080}:8080"
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -34,7 +38,7 @@ services:
   web:
     build: ./frontend
     ports:
-      - "4200:8080"
+      - "${UI_PORT:-4200}:8080"
     networks:
       default:
         ipv4_address: 172.28.10.10

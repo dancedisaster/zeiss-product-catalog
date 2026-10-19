@@ -24,12 +24,16 @@ docker compose up --build
 
 The API applies the EF Core migrations and seeds 12 sample products on start-up.
 
+SQL Server is published on port 14330, not 1433, so a SQL Server already installed on the machine does not get in the
+way. If 4200, 5080 or 14330 is taken, override it: `UI_PORT=4300 API_PORT=5090 SQLSERVER_PORT=14331 docker compose up --build`
+(PowerShell: `$env:UI_PORT=4300; docker compose up --build`).
+
 ## Running locally (for development)
 
 Requirements: .NET SDK 10, Node.js 24 LTS (or ≥ 22.22.3), Docker (for SQL Server and the integration tests) or SQL Server LocalDB (see below).
 
 ```bash
-# 1. SQL Server
+# 1. SQL Server in Docker, on localhost:14330 (appsettings.Development.json points there)
 docker compose up -d sqlserver
 
 # 2. API on http://localhost:5080 (migrates + seeds in Development)
@@ -60,7 +64,9 @@ npm start                                                              # http://
 
 The `localdb` profile in `launchSettings.json` only overrides the connection string
 (`Server=(localdb)\MSSQLLocalDB;Database=ProductCatalog;Trusted_Connection=True`). In Visual Studio or Rider, pick the
-`localdb` profile in the run dropdown. Unit and Angular tests need no database; only the integration/BDD tests need Docker.
+`localdb` profile in the run dropdown. With SQL Server Express installed instead, use `--launch-profile sqlexpress`
+(`Server=.\SQLEXPRESS`, Windows authentication). Unit and Angular tests need no database; only the integration/BDD
+tests need Docker.
 
 The development connection string lives in `appsettings.Development.json` and targets the local SQL Server
 container only. Other environments provide `ConnectionStrings__Catalog` through environment variables /
