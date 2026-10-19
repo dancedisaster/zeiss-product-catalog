@@ -17,6 +17,10 @@ builder.Services
 
 var app = builder.Build();
 
+// First, so HTTPS redirection, rate limiting and logging all see the real client address and scheme.
+app.UseForwardedHeaders();
+// Outside the exception handler, so the log shows the status the client really got, 500s included.
+app.UseHttpLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
@@ -29,6 +33,8 @@ if (!app.Environment.IsDevelopment())
 app.UseSecurityHeaders();
 app.UseCors(ApiServiceCollectionExtensions.FrontendCorsPolicy);
 app.UseRateLimiter();
+app.UseRequestTimeouts();
+app.UseRequestCancellation();
 
 if (app.Environment.IsDevelopment())
 {

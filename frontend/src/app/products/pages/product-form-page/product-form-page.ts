@@ -1,10 +1,28 @@
 import { httpResource } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal } from '@angular/core';
-import { FormField, FormRoot, form, max, maxLength, min, pattern, required, schema } from '@angular/forms/signals';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  linkedSignal,
+  signal,
+} from '@angular/core';
+import {
+  FormField,
+  FormRoot,
+  form,
+  max,
+  maxLength,
+  min,
+  pattern,
+  required,
+  schema,
+} from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
 import { NotificationService } from '../../../core/notifications/notification.service';
 import { ProductStore } from '../../data-access/product-store';
-import { Category, CreateProductRequest, Product } from '../../models/product';
+import { Category, Product } from '../../models/product';
 
 interface ProductFormModel {
   name: string;
@@ -15,7 +33,14 @@ interface ProductFormModel {
   categoryId: string;
 }
 
-const EMPTY_MODEL: ProductFormModel = { name: '', description: '', sku: '', price: 0, stock: 0, categoryId: '' };
+const EMPTY_MODEL: ProductFormModel = {
+  name: '',
+  description: '',
+  sku: '',
+  price: 0,
+  stock: 0,
+  categoryId: '',
+};
 
 /** Client-side rules mirror the API validators for fast feedback; the API remains the authority. */
 const productSchema = schema<ProductFormModel>((p) => {
@@ -47,8 +72,12 @@ export class ProductFormPage {
 
   protected readonly isEdit = computed(() => this.id() !== undefined);
 
-  protected readonly categories = httpResource<Category[]>(() => '/api/categories', { defaultValue: [] });
-  protected readonly product = httpResource<Product>(() => (this.id() ? `/api/products/${this.id()}` : undefined));
+  protected readonly categories = httpResource<Category[]>(() => '/api/categories', {
+    defaultValue: [],
+  });
+  protected readonly product = httpResource<Product>(() =>
+    this.id() ? `/api/products/${this.id()}` : undefined,
+  );
 
   /** Writable form model that resets whenever a (different) product is loaded. */
   protected readonly model = linkedSignal<ProductFormModel>(() => {
@@ -65,25 +94,38 @@ export class ProductFormPage {
       : EMPTY_MODEL;
   });
 
+  /** Set when someone else saved this product after it was loaded here. */
+  protected readonly conflict = signal(false);
+
   protected readonly productForm = form(this.model, productSchema, {
     submission: {
       action: async (field) => {
         const value = field().value();
-        const request: CreateProductRequest = {
+        const details = {
           name: value.name.trim(),
           description: value.description.trim() || null,
           sku: value.sku.trim(),
           price: value.price,
-          stock: value.stock,
           categoryId: Number(value.categoryId),
         };
 
+        // In edit mode the form is only shown once the product has loaded, so its version is known.
         const id = this.id();
-        const result = id ? await this.store.update(Number(id), request) : await this.store.create(request);
+        const result = id
+          ? await this.store.update(Number(id), {
+              ...details,
+              version: this.product.value()!.version,
+            })
+          : await this.store.create({ ...details, stock: value.stock });
 
         if (result.ok) {
           this.notifications.success(`${result.value.name} saved (#${result.value.id}).`);
           await this.router.navigate(['/products']);
+          return undefined;
+        }
+
+        if (result.error.code === 'product.concurrent_update') {
+          this.conflict.set(true);
           return undefined;
         }
 
@@ -107,4 +149,10 @@ export class ProductFormPage {
       },
     },
   });
+
+  /** Replaces the form with what is saved now; the user re-applies their change on top of it. */
+  protected loadLatest(): void {
+    this.conflict.set(false);
+    this.product.reload();
+  }
 }

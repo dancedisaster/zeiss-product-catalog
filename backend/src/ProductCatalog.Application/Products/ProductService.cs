@@ -17,9 +17,22 @@ internal sealed partial class ProductService(
     ILogger<ProductService> logger) : IProductService
 {
     public const int SearchTermMaxLength = Product.NameMaxLength;
+    public const int DefaultPageSize = 20;
+    public const int MaxPageSize = 100;
 
-    public async Task<IReadOnlyList<ProductDto>> ListAsync(CancellationToken cancellationToken)
-        => (await products.ListAsync(cancellationToken)).ToDtos();
+    private static readonly ProductOrder ByName = new(ProductSortColumn.Name);
+    private static readonly ProductOrder ByStock = new(ProductSortColumn.Stock);
+
+    private static readonly Dictionary<string, ProductSortColumn> SortColumns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["name"] = ProductSortColumn.Name,
+        ["categoryName"] = ProductSortColumn.CategoryName,
+        ["price"] = ProductSortColumn.Price,
+        ["stock"] = ProductSortColumn.Stock,
+    };
+
+    public Task<Result<ProductPage>> ListAsync(ListOptions options, CancellationToken cancellationToken)
+        => QueryAsync(new ProductFilter(), ByName, options, new Dictionary<string, string[]>(), cancellationToken);
 
     public async Task<Result<ProductDto>> GetAsync(int id, CancellationToken cancellationToken)
     {
@@ -27,7 +40,8 @@ internal sealed partial class ProductService(
         return product is null ? ProductNotFound(id) : product.ToDto();
     }
 
-    public async Task<Result<IReadOnlyList<ProductDto>>> SearchAsync(string? name, CancellationToken cancellationToken)
+    public async Task<Result<ProductPage>> SearchAsync(
+        string? name, int? min, int? max, ListOptions options, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -39,32 +53,16 @@ internal sealed partial class ProductService(
             return Error.Validation("name", $"The search term must be at most {SearchTermMaxLength} characters.");
         }
 
-        return ToResult(await products.SearchByNameAsync(name.Trim(), cancellationToken));
+        // The stock range is optional here; it lets a client combine both filters and still page correctly.
+        var errors = StockRangeErrors(min, max);
+        return await QueryAsync(new ProductFilter(name.Trim(), min, max), ByName, options, errors, cancellationToken);
     }
 
-    public async Task<Result<IReadOnlyList<ProductDto>>> ListByStockLevelAsync(int? min, int? max, CancellationToken cancellationToken)
-    {
-        var lower = min ?? 0;
-        var upper = max ?? int.MaxValue;
+    public Task<Result<ProductPage>> ListByStockLevelAsync(int? min, int? max, ListOptions options, CancellationToken cancellationToken)
+        => QueryAsync(new ProductFilter(MinStock: min ?? 0, MaxStock: max), ByStock, options, StockRangeErrors(min, max), cancellationToken);
 
-        var errors = new Dictionary<string, string[]>();
-        if (lower < 0)
-        {
-            errors["min"] = ["'min' must be greater than or equal to 0."];
-        }
-
-        if (upper < lower)
-        {
-            errors["max"] = ["'max' must be greater than or equal to 'min'."];
-        }
-
-        if (errors.Count > 0)
-        {
-            return Error.Validation(errors);
-        }
-
-        return ToResult(await products.ListByStockRangeAsync(lower, upper, cancellationToken));
-    }
+    public Task<ProductSummary> GetSummaryAsync(CancellationToken cancellationToken)
+        => products.GetSummaryAsync(cancellationToken);
 
     public async Task<Result<ProductDto>> CreateAsync(CreateProductRequest request, CancellationToken cancellationToken)
     {
@@ -74,10 +72,11 @@ internal sealed partial class ProductService(
             return validation.ToError();
         }
 
-        var category = await categories.GetByIdAsync(request.CategoryId, cancellationToken);
+        // From here on the validator guarantees the numeric fields are present.
+        var category = await categories.GetByIdAsync(request.CategoryId!.Value, cancellationToken);
         if (category is null)
         {
-            return CategoryNotFound(request.CategoryId);
+            return CategoryNotFound(request.CategoryId.Value);
         }
 
         if (await products.SkuExistsAsync(request.Sku, excludingProductId: null, cancellationToken))
@@ -91,8 +90,8 @@ internal sealed partial class ProductService(
             request.Name,
             request.Description,
             request.Sku,
-            request.Price,
-            request.Stock,
+            request.Price!.Value,
+            request.Stock!.Value,
             category,
             clock.GetUtcNow());
 
@@ -126,10 +125,18 @@ internal sealed partial class ProductService(
             return ProductNotFound(id);
         }
 
-        var category = await categories.GetByIdAsync(request.CategoryId, cancellationToken);
+        // A client that sends the version it loaded is protected: a different one means someone else saved the details
+        // since then, and applying this update would silently overwrite their change. A client written to the original
+        // contract sends none, and its update applies to the current details, as it always did.
+        if (request.Version is { } loadedVersion && product.Version != loadedVersion)
+        {
+            return ConcurrentUpdate(id);
+        }
+
+        var category = await categories.GetByIdAsync(request.CategoryId!.Value, cancellationToken);
         if (category is null)
         {
-            return CategoryNotFound(request.CategoryId);
+            return CategoryNotFound(request.CategoryId.Value);
         }
 
         if (await products.SkuExistsAsync(request.Sku, excludingProductId: id, cancellationToken))
@@ -137,7 +144,7 @@ internal sealed partial class ProductService(
             return DuplicateSku(request.Sku);
         }
 
-        product.UpdateDetails(request.Name, request.Description, request.Sku, request.Price, category, clock.GetUtcNow());
+        product.UpdateDetails(request.Name, request.Description, request.Sku, request.Price!.Value, category, clock.GetUtcNow());
 
         try
         {
@@ -149,12 +156,14 @@ internal sealed partial class ProductService(
         }
         catch (ConcurrencyConflictException)
         {
-            return Error.Conflict(
-                "product.concurrent_update",
-                $"Product {id} was changed by another request. Reload it and try again.");
+            // Someone saved between our read and our write (the version check above runs too early to see it).
+            return ConcurrentUpdate(id);
         }
 
-        return product.ToDto();
+        // A stock movement that committed after our read does not change the version, so the save did not conflict,
+        // and the stock we loaded may be out of date. Read it again so the response shows what is really available.
+        var stock = await products.GetStockAsync(id, cancellationToken);
+        return product.ToDto() with { Stock = stock ?? product.Stock };
     }
 
     public async Task<Result> DeleteAsync(int id, CancellationToken cancellationToken)
@@ -210,14 +219,103 @@ internal sealed partial class ProductService(
             : Error.Validation("quantity", "The resulting stock would exceed the maximum allowed value.");
     }
 
-    private static Result<IReadOnlyList<ProductDto>> ToResult(IReadOnlyList<Product> items)
-        => Result<IReadOnlyList<ProductDto>>.Success(items.ToDtos());
+    /// <summary>Validates paging and sorting next to the endpoint's own errors, so all problems are reported at once.</summary>
+    private async Task<Result<ProductPage>> QueryAsync(
+        ProductFilter filter,
+        ProductOrder defaultOrder,
+        ListOptions options,
+        Dictionary<string, string[]> errors,
+        CancellationToken cancellationToken)
+    {
+        var order = ReadOrder(options, defaultOrder, errors);
+        var page = ReadPage(options, errors);
+        if (errors.Count > 0)
+        {
+            return Error.Validation(errors);
+        }
+
+        var result = await products.QueryAsync(filter, order, page, cancellationToken);
+        return new ProductPage(result.Items.ToDtos(), result.TotalCount);
+    }
+
+    private static ProductOrder ReadOrder(ListOptions options, ProductOrder defaultOrder, Dictionary<string, string[]> errors)
+    {
+        if (options.SortBy is null)
+        {
+            if (options.SortDir is not null)
+            {
+                errors["sortDir"] = ["'sortDir' can only be used together with 'sortBy'."];
+            }
+
+            return defaultOrder;
+        }
+
+        if (!SortColumns.TryGetValue(options.SortBy, out var column))
+        {
+            errors["sortBy"] = [$"'sortBy' must be one of: {string.Join(", ", SortColumns.Keys)}."];
+            return defaultOrder;
+        }
+
+        var descending = options.SortDir?.ToUpperInvariant() switch
+        {
+            null or "ASC" => false,
+            "DESC" => true,
+            _ => (bool?)null,
+        };
+        if (descending is null)
+        {
+            errors["sortDir"] = ["'sortDir' must be 'asc' or 'desc'."];
+        }
+
+        return new ProductOrder(column, descending ?? false);
+    }
+
+    /// <summary>Paging is opt-in: without page and pageSize every match is returned, as the original contract requires.</summary>
+    private static PageRequest? ReadPage(ListOptions options, Dictionary<string, string[]> errors)
+    {
+        if (options.Page is null && options.PageSize is null)
+        {
+            return null;
+        }
+
+        var page = new PageRequest(options.Page ?? 1, options.PageSize ?? DefaultPageSize);
+        if (page.Page < 1)
+        {
+            errors["page"] = ["'page' must be 1 or greater."];
+        }
+
+        if (page.PageSize is < 1 or > MaxPageSize)
+        {
+            errors["pageSize"] = [$"'pageSize' must be between 1 and {MaxPageSize}."];
+        }
+
+        return page;
+    }
+
+    private static Dictionary<string, string[]> StockRangeErrors(int? min, int? max)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (min < 0)
+        {
+            errors["min"] = ["'min' must be greater than or equal to 0."];
+        }
+
+        if (max < (min ?? 0))
+        {
+            errors["max"] = ["'max' must be greater than or equal to 'min'."];
+        }
+
+        return errors;
+    }
 
     private static Error InvalidQuantity() => Error.Validation("quantity", "Quantity must be greater than zero.");
 
     private static Error ProductNotFound(int id) => Error.NotFound("product.not_found", $"Product {id} was not found.");
 
     private static Error CategoryNotFound(int categoryId) => Error.Validation("categoryId", $"Category {categoryId} does not exist.");
+
+    private static Error ConcurrentUpdate(int id)
+        => Error.Conflict("product.concurrent_update", $"Product {id} was changed by someone else. Reload it and try again.");
 
     private static Error DuplicateSku(string sku)
         => Error.Conflict("product.duplicate_sku", $"A product with SKU '{sku.Trim().ToUpperInvariant()}' already exists.");

@@ -23,6 +23,7 @@ internal static class TestData
         int categoryId = 1)
         => new(name, "Progressive lens", sku, price, stock, categoryId);
 
-    public static UpdateProductRequest UpdateRequest(string sku = "LNS-001", int categoryId = 3)
-        => new("Renamed product", "New description", sku, 199.99m, categoryId);
+    /// <param name="version">The version the client loaded, normally <c>product.Version</c>.</param>
+    public static UpdateProductRequest UpdateRequest(Guid version, string sku = "LNS-001", int categoryId = 3)
+        => new("Renamed product", "New description", sku, 199.99m, categoryId, version);
 }

@@ -30,6 +30,24 @@ public class ProductValidatorTests
     }
 
     [Fact]
+    public void An_empty_create_request_reports_each_missing_field_once_as_required()
+    {
+        // What System.Text.Json produces for "{}".
+        var result = _create.Validate(new CreateProductRequest(null!, null, null!, null, null, null));
+
+        Assert.Equal(["CategoryId", "Name", "Price", "Sku", "Stock"], result.Errors.Select(e => e.PropertyName).Order());
+        Assert.All(result.Errors, e => Assert.EndsWith("is required.", e.ErrorMessage, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Missing_stock_is_rejected_instead_of_becoming_zero()
+    {
+        var result = _create.Validate(TestData.CreateRequest() with { Stock = null });
+
+        Assert.Equal("Stock", Assert.Single(result.Errors).PropertyName);
+    }
+
+    [Fact]
     public void Name_longer_than_the_limit_is_rejected()
     {
         var result = _create.Validate(TestData.CreateRequest(name: new string('x', 101)));
@@ -45,12 +63,31 @@ public class ProductValidatorTests
 
     [Fact]
     public void A_complete_update_request_is_valid()
-        => Assert.True(_update.Validate(TestData.UpdateRequest()).IsValid);
+        => Assert.True(_update.Validate(TestData.UpdateRequest(Guid.NewGuid())).IsValid);
 
     [Fact]
     public void Update_request_requires_a_valid_sku()
     {
-        var result = _update.Validate(TestData.UpdateRequest(sku: "not valid!"));
+        var result = _update.Validate(TestData.UpdateRequest(Guid.NewGuid(), sku: "not valid!"));
         Assert.Contains(result.Errors, e => e.PropertyName == "Sku");
+    }
+
+    [Fact]
+    public void An_empty_update_request_reports_each_missing_field()
+    {
+        var result = _update.Validate(new UpdateProductRequest(null!, null, null!, null, null, null));
+
+        Assert.Equal(["CategoryId", "Name", "Price", "Sku"], result.Errors.Select(e => e.PropertyName).Order());
+    }
+
+    [Fact]
+    public void An_update_request_without_a_version_is_valid_as_in_the_original_contract()
+        => Assert.True(_update.Validate(TestData.UpdateRequest(Guid.NewGuid()) with { Version = null }).IsValid);
+
+    [Fact]
+    public void An_update_request_with_an_empty_version_is_invalid()
+    {
+        var result = _update.Validate(TestData.UpdateRequest(Guid.Empty));
+        Assert.Equal("Version", Assert.Single(result.Errors).PropertyName);
     }
 }

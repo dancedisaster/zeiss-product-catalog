@@ -4,13 +4,15 @@ namespace ProductCatalog.Application.Products;
 
 public interface IProductService
 {
-    Task<IReadOnlyList<ProductDto>> ListAsync(CancellationToken cancellationToken);
+    Task<Result<ProductPage>> ListAsync(ListOptions options, CancellationToken cancellationToken);
 
     Task<Result<ProductDto>> GetAsync(int id, CancellationToken cancellationToken);
 
-    Task<Result<IReadOnlyList<ProductDto>>> SearchAsync(string? name, CancellationToken cancellationToken);
+    Task<Result<ProductPage>> SearchAsync(string? name, int? min, int? max, ListOptions options, CancellationToken cancellationToken);
 
-    Task<Result<IReadOnlyList<ProductDto>>> ListByStockLevelAsync(int? min, int? max, CancellationToken cancellationToken);
+    Task<Result<ProductPage>> ListByStockLevelAsync(int? min, int? max, ListOptions options, CancellationToken cancellationToken);
+
+    Task<ProductSummary> GetSummaryAsync(CancellationToken cancellationToken);
 
     Task<Result<ProductDto>> CreateAsync(CreateProductRequest request, CancellationToken cancellationToken);
 

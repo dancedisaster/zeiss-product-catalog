@@ -17,6 +17,9 @@ public sealed class Product
     public const int DescriptionMaxLength = 1_000;
     public const int SkuMaxLength = 32;
 
+    /// <summary>A product with 1 to this many units is "low on stock". The UI uses the same value.</summary>
+    public const int LowStockThreshold = 10;
+
     // Required by EF Core to materialise entities.
     private Product()
     {
@@ -33,7 +36,10 @@ public sealed class Product
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    /// <summary>Optimistic concurrency token, renewed on every change.</summary>
+    /// <summary>
+    /// Optimistic concurrency token for the details (name, SKU, price...), renewed whenever they change.
+    /// Stock movements do not renew it, so they never conflict with an edit.
+    /// </summary>
     public Guid Version { get; private set; }
 
     public static Product Create(

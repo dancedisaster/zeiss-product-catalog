@@ -14,7 +14,8 @@ internal static class ProductMappings
         product.CategoryId,
         product.Category?.Name ?? string.Empty,
         product.CreatedAt,
-        product.UpdatedAt);
+        product.UpdatedAt,
+        product.Version);
 
     public static IReadOnlyList<ProductDto> ToDtos(this IEnumerable<Product> products)
         => products.Select(ToDto).ToList();

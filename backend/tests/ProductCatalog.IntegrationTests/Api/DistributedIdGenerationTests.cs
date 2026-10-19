@@ -31,6 +31,27 @@ public class DistributedIdGenerationTests
     }
 
     [Fact]
+    public async Task Two_instances_starting_together_seed_the_sample_data_exactly_once()
+    {
+        // Several attempts, because the race this guards against only shows when the timing lines up.
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var connectionString = await SqlServerContainer.CreateDatabaseConnectionStringAsync();
+            // The database must exist first: creating it is not coordinated between instances (DECISIONS 13).
+            await using (var migrator = new CatalogApiFactory(connectionString, seedSampleData: false))
+            {
+                _ = migrator.Server;
+            }
+
+            await using var instanceA = new CatalogApiFactory(connectionString, seedSampleData: true);
+            await using var instanceB = new CatalogApiFactory(connectionString, seedSampleData: true);
+            await Task.WhenAll(Task.Run(() => instanceA.Server), Task.Run(() => instanceB.Server));
+
+            Assert.Equal(12, (await new ProductApi(instanceB.CreateClient()).ListAsync()).Count);
+        }
+    }
+
+    [Fact]
     public async Task Concurrent_decrements_from_two_instances_never_oversell()
     {
         var connectionString = await SqlServerContainer.CreateDatabaseConnectionStringAsync();

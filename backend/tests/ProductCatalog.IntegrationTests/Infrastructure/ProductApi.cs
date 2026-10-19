@@ -14,6 +14,10 @@ public sealed class ProductApi(HttpClient http)
     public static CreateProductRequest NewProduct(string? sku = null, int stock = 10, string name = "Test product")
         => new(name, "Created by a test", sku ?? $"TST-{Guid.NewGuid():N}"[..20], 49.90m, stock, CategoryId: 1);
 
+    /// <summary>An update that keeps every detail of <paramref name="loaded"/>, like a form opened on it.</summary>
+    public static UpdateProductRequest EditOf(ProductDto loaded)
+        => new(loaded.Name, loaded.Description, loaded.Sku, loaded.Price, loaded.CategoryId, loaded.Version);
+
     public Task<HttpResponseMessage> CreateAsync(CreateProductRequest request) => Http.PostAsJsonAsync(Base, request);
 
     public async Task<ProductDto> CreateOkAsync(CreateProductRequest request)

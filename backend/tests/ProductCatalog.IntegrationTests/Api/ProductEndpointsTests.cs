@@ -44,6 +44,27 @@ public class ProductEndpointsTests(ApiFixture fixture) : IClassFixture<ApiFixtur
     }
 
     [Fact]
+    public async Task Post_with_an_empty_body_reports_every_required_field()
+    {
+        var response = await _api.Http.PostAsJsonAsync("/api/products", new { });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblem>();
+        Assert.Equal(["categoryId", "name", "price", "sku", "stock"], problem!.Errors.Keys.Order());
+        Assert.All(problem.Errors.Values, messages => Assert.EndsWith("is required.", Assert.Single(messages), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Post_without_stock_is_rejected_instead_of_defaulting_to_zero()
+    {
+        var response = await _api.Http.PostAsJsonAsync("/api/products", new { name = "No stock given", sku = "NO-STOCK-1", price = 10m, categoryId = 1 });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblem>();
+        Assert.Equal(["stock"], problem!.Errors.Keys);
+    }
+
+    [Fact]
     public async Task Post_with_unknown_category_is_rejected()
     {
         var response = await _api.CreateAsync(ProductApi.NewProduct() with { CategoryId = 999 });
@@ -80,21 +101,77 @@ public class ProductEndpointsTests(ApiFixture fixture) : IClassFixture<ApiFixtur
     {
         var created = await _api.CreateOkAsync(ProductApi.NewProduct(stock: 9));
 
-        var response = await _api.UpdateAsync(created.Id, new UpdateProductRequest("Renamed", null, created.Sku, 10m, 3));
+        var response = await _api.UpdateAsync(created.Id, new UpdateProductRequest("Renamed", null, created.Sku, 10m, 3, created.Version));
         var updated = await response.Content.ReadFromJsonAsync<ProductDto>();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("Renamed", updated!.Name);
         Assert.Equal("Frames", updated.CategoryName);
         Assert.Equal(9, updated.Stock);
+        Assert.NotEqual(created.Version, updated.Version);
     }
 
     [Fact]
     public async Task Put_on_missing_product_is_404()
     {
-        var response = await _api.UpdateAsync(999_998, new UpdateProductRequest("X", null, "SKU-X", 10m, 1));
+        var response = await _api.UpdateAsync(999_998, new UpdateProductRequest("X", null, "SKU-X", 10m, 1, Guid.NewGuid()));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_without_a_version_updates_the_current_details_as_in_the_original_contract()
+    {
+        var created = await _api.CreateOkAsync(ProductApi.NewProduct());
+        Assert.Equal(HttpStatusCode.OK, (await _api.UpdateAsync(created.Id, ProductApi.EditOf(created) with { Name = "First edit" })).StatusCode);
+
+        var response = await _api.UpdateAsync(created.Id, ProductApi.EditOf(created) with { Name = "No version", Version = null });
+        var updated = await response.Content.ReadFromJsonAsync<ProductDto>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("No version", updated!.Name);
+    }
+
+    [Fact]
+    public async Task Put_with_an_empty_version_is_a_bad_request()
+    {
+        var created = await _api.CreateOkAsync(ProductApi.NewProduct());
+
+        var response = await _api.UpdateAsync(created.Id, ProductApi.EditOf(created) with { Version = Guid.Empty });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblem>();
+        Assert.Equal(["version"], problem!.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task Put_based_on_a_stale_version_is_a_conflict_and_keeps_the_other_edit()
+    {
+        var created = await _api.CreateOkAsync(ProductApi.NewProduct());
+        // Two users open the same product; the first one saves.
+        Assert.Equal(HttpStatusCode.OK, (await _api.UpdateAsync(created.Id, ProductApi.EditOf(created) with { Name = "First edit" })).StatusCode);
+
+        var second = await _api.UpdateAsync(created.Id, ProductApi.EditOf(created) with { Name = "Second edit" });
+        var current = await (await _api.GetAsync(created.Id)).Content.ReadFromJsonAsync<ProductDto>();
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Equal("product.concurrent_update", (await second.Content.ReadFromJsonAsync<CodedProblem>())!.Code);
+        Assert.Equal("First edit", current!.Name);
+    }
+
+    [Fact]
+    public async Task A_stock_movement_does_not_invalidate_an_open_edit()
+    {
+        var created = await _api.CreateOkAsync(ProductApi.NewProduct(stock: 5));
+        // A sale happens while the edit form is open.
+        Assert.Equal(HttpStatusCode.OK, (await _api.DecrementAsync(created.Id, 2)).StatusCode);
+
+        var response = await _api.UpdateAsync(created.Id, ProductApi.EditOf(created) with { Name = "Edited during a sale" });
+        var updated = await response.Content.ReadFromJsonAsync<ProductDto>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Edited during a sale", updated!.Name);
+        Assert.Equal(3, updated.Stock);
     }
 
     [Fact]
@@ -211,4 +288,6 @@ public class ProductEndpointsTests(ApiFixture fixture) : IClassFixture<ApiFixtur
     }
 
     private sealed record ValidationProblem(Dictionary<string, string[]> Errors);
+
+    private sealed record CodedProblem(string Code);
 }

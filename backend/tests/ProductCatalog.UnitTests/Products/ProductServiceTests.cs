@@ -119,19 +119,21 @@ public class ProductServiceTests
     [InlineData("   ")]
     public async Task Search_requires_a_term(string? term)
     {
-        var result = await _service.SearchAsync(term, CancellationToken.None);
+        var result = await _service.SearchAsync(term, null, null, ListOptions.None, CancellationToken.None);
 
         Assert.Equal(ErrorType.Validation, result.Error!.Type);
     }
 
     [Fact]
-    public async Task Search_trims_the_term_before_querying()
+    public async Task Search_trims_the_term_and_can_narrow_by_stock()
     {
-        _products.SearchByNameAsync("smart", Arg.Any<CancellationToken>()).Returns([TestData.Product()]);
+        ReturnsFromQuery(TestData.Product());
 
-        var result = await _service.SearchAsync("  smart ", CancellationToken.None);
+        var result = await _service.SearchAsync("  smart ", 1, 10, ListOptions.None, CancellationToken.None);
 
-        Assert.Single(result.Value);
+        Assert.Single(result.Value.Items);
+        await _products.Received(1).QueryAsync(
+            new ProductFilter("smart", 1, 10), new ProductOrder(ProductSortColumn.Name), null, Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -139,20 +141,87 @@ public class ProductServiceTests
     [InlineData(10, 5, "max")]
     public async Task Stock_level_rejects_invalid_ranges(int min, int max, string field)
     {
-        var result = await _service.ListByStockLevelAsync(min, max, CancellationToken.None);
+        var result = await _service.ListByStockLevelAsync(min, max, ListOptions.None, CancellationToken.None);
 
         Assert.Contains(field, result.Error!.ValidationErrors!.Keys);
     }
 
     [Fact]
-    public async Task Stock_level_defaults_to_the_full_range_when_bounds_are_missing()
+    public async Task Stock_level_starts_at_zero_and_is_ordered_by_stock_by_default()
     {
-        _products.ListByStockRangeAsync(0, int.MaxValue, Arg.Any<CancellationToken>()).Returns([TestData.Product()]);
+        ReturnsFromQuery(TestData.Product());
 
-        var result = await _service.ListByStockLevelAsync(null, null, CancellationToken.None);
+        var result = await _service.ListByStockLevelAsync(null, null, ListOptions.None, CancellationToken.None);
 
-        Assert.Single(result.Value);
+        Assert.Single(result.Value.Items);
+        await _products.Received(1).QueryAsync(
+            new ProductFilter(MinStock: 0), new ProductOrder(ProductSortColumn.Stock), null, Arg.Any<CancellationToken>());
     }
+
+    // ---- Paging and sorting ----
+
+    [Fact]
+    public async Task Without_paging_parameters_every_match_is_returned()
+    {
+        ReturnsFromQuery(TestData.Product());
+
+        var result = await _service.ListAsync(ListOptions.None, CancellationToken.None);
+
+        Assert.Equal(1, result.Value.TotalCount);
+        await _products.Received(1).QueryAsync(Arg.Any<ProductFilter>(), Arg.Any<ProductOrder>(), null, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Paging_and_sorting_parameters_reach_the_repository()
+    {
+        ReturnsFromQuery(TestData.Product());
+
+        await _service.ListAsync(new ListOptions(Page: 3, PageSize: 25, SortBy: "PRICE", SortDir: "desc"), CancellationToken.None);
+
+        await _products.Received(1).QueryAsync(
+            new ProductFilter(), new ProductOrder(ProductSortColumn.Price, Descending: true), new PageRequest(3, 25), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Page_size_alone_starts_at_page_one_and_page_alone_uses_the_default_size()
+    {
+        ReturnsFromQuery(TestData.Product());
+
+        await _service.ListAsync(new ListOptions(PageSize: 5), CancellationToken.None);
+        await _service.ListAsync(new ListOptions(Page: 2), CancellationToken.None);
+
+        await _products.Received(1).QueryAsync(Arg.Any<ProductFilter>(), Arg.Any<ProductOrder>(), new PageRequest(1, 5), Arg.Any<CancellationToken>());
+        await _products.Received(1).QueryAsync(
+            Arg.Any<ProductFilter>(), Arg.Any<ProductOrder>(), new PageRequest(2, ProductService.DefaultPageSize), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(0, 10, null, null, "page")]
+    [InlineData(1, 0, null, null, "pageSize")]
+    [InlineData(1, 101, null, null, "pageSize")]
+    [InlineData(null, null, "colour", null, "sortBy")]
+    [InlineData(null, null, "price", "up", "sortDir")]
+    [InlineData(null, null, null, "desc", "sortDir")]
+    public async Task Invalid_paging_or_sorting_is_a_validation_error_and_queries_nothing(
+        int? page, int? pageSize, string? sortBy, string? sortDir, string field)
+    {
+        var result = await _service.ListAsync(new ListOptions(page, pageSize, sortBy, sortDir), CancellationToken.None);
+
+        Assert.Contains(field, result.Error!.ValidationErrors!.Keys);
+        await _products.DidNotReceiveWithAnyArgs().QueryAsync(default!, default!, default, default);
+    }
+
+    [Fact]
+    public async Task Range_and_paging_errors_are_reported_together()
+    {
+        var result = await _service.ListByStockLevelAsync(-1, null, new ListOptions(PageSize: 500), CancellationToken.None);
+
+        Assert.Equal(["min", "pageSize"], result.Error!.ValidationErrors!.Keys.Order());
+    }
+
+    private void ReturnsFromQuery(params Product[] items)
+        => _products.QueryAsync(Arg.Any<ProductFilter>(), Arg.Any<ProductOrder>(), Arg.Any<PageRequest?>(), Arg.Any<CancellationToken>())
+            .Returns(new ProductQueryResult(items, items.Length));
 
     // ---- Update / Delete ----
 
@@ -162,19 +231,61 @@ public class ProductServiceTests
         var product = TestData.Product(stock: 4);
         _products.GetByIdAsync(product.Id, Arg.Any<CancellationToken>()).Returns(product);
 
-        var result = await _service.UpdateAsync(product.Id, TestData.UpdateRequest(), CancellationToken.None);
+        var loadedVersion = product.Version;
+
+        var result = await _service.UpdateAsync(product.Id, TestData.UpdateRequest(loadedVersion), CancellationToken.None);
 
         Assert.Equal("Renamed product", result.Value.Name);
         Assert.Equal("Frames", result.Value.CategoryName);
         Assert.Equal(4, result.Value.Stock);
+        Assert.NotEqual(loadedVersion, result.Value.Version); // the next edit must send the new version
     }
 
     [Fact]
     public async Task Update_unknown_product_is_not_found()
     {
-        var result = await _service.UpdateAsync(111_111, TestData.UpdateRequest(), CancellationToken.None);
+        var result = await _service.UpdateAsync(111_111, TestData.UpdateRequest(Guid.NewGuid()), CancellationToken.None);
 
         Assert.Equal(ErrorType.NotFound, result.Error!.Type);
+    }
+
+    [Fact]
+    public async Task Update_based_on_a_stale_version_is_a_conflict_and_saves_nothing()
+    {
+        var product = TestData.Product();
+        _products.GetByIdAsync(product.Id, Arg.Any<CancellationToken>()).Returns(product);
+
+        var result = await _service.UpdateAsync(product.Id, TestData.UpdateRequest(Guid.NewGuid()), CancellationToken.None);
+
+        Assert.Equal(ErrorType.Conflict, result.Error!.Type);
+        Assert.Equal("product.concurrent_update", result.Error.Code);
+        Assert.Equal("SmartLife Progressive", product.Name);
+        await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Update_without_a_version_applies_to_the_current_details()
+    {
+        var product = TestData.Product();
+        _products.GetByIdAsync(product.Id, Arg.Any<CancellationToken>()).Returns(product);
+
+        var result = await _service.UpdateAsync(product.Id, TestData.UpdateRequest(Guid.NewGuid()) with { Version = null }, CancellationToken.None);
+
+        Assert.Equal("Renamed product", result.Value.Name);
+        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Update_returns_the_stock_as_stored_after_the_save_not_as_loaded()
+    {
+        var product = TestData.Product(stock: 4);
+        _products.GetByIdAsync(product.Id, Arg.Any<CancellationToken>()).Returns(product);
+        // A sale committed while the update was running; it does not change the version, so the save succeeds.
+        _products.GetStockAsync(product.Id, Arg.Any<CancellationToken>()).Returns(1);
+
+        var result = await _service.UpdateAsync(product.Id, TestData.UpdateRequest(product.Version), CancellationToken.None);
+
+        Assert.Equal(1, result.Value.Stock);
     }
 
     [Fact]
@@ -185,7 +296,7 @@ public class ProductServiceTests
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
             .ThrowsAsync(new ConcurrencyConflictException("changed"));
 
-        var result = await _service.UpdateAsync(product.Id, TestData.UpdateRequest(), CancellationToken.None);
+        var result = await _service.UpdateAsync(product.Id, TestData.UpdateRequest(product.Version), CancellationToken.None);
 
         Assert.Equal("product.concurrent_update", result.Error!.Code);
     }

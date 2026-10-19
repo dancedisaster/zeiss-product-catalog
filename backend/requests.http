@@ -4,6 +4,7 @@
 GET {{api}}/products
 
 ###
+# @name product
 GET {{api}}/products/100000
 
 ###
@@ -13,10 +14,12 @@ Content-Type: application/json
 { "name": "SmartLife Progressive 1.74", "description": "Ultra-thin", "sku": "LNS-SLP-174", "price": 349.00, "stock": 12, "categoryId": 1 }
 
 ###
+# Send the version from the GET above (run it first). Sending this twice returns 409: the version is stale.
+# Without "version" (as in the original contract) the update applies to whatever is current.
 PUT {{api}}/products/100000
 Content-Type: application/json
 
-{ "name": "SmartLife Progressive 1.60", "description": "Updated", "sku": "LNS-SLP-160", "price": 299.00, "categoryId": 1 }
+{ "name": "SmartLife Progressive 1.60", "description": "Updated", "sku": "LNS-SLP-160", "price": 299.00, "categoryId": 1, "version": "{{product.response.body.$.version}}" }
 
 ###
 POST {{api}}/products/100000/decrement-stock/5
@@ -29,6 +32,16 @@ GET {{api}}/products/search?name=smart
 
 ###
 GET {{api}}/products/stock-level?min=0&max=10
+
+###
+# Paging and sorting are optional on all three list endpoints; the total is in the X-Total-Count header
+GET {{api}}/products?page=1&pageSize=5&sortBy=price&sortDir=desc
+
+###
+GET {{api}}/products/search?name=lens&min=1&max=1000&page=1&pageSize=10
+
+###
+GET {{api}}/products/summary
 
 ###
 DELETE {{api}}/products/100011

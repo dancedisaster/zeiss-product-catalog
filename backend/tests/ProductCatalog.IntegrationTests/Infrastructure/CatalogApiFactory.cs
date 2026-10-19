@@ -5,7 +5,11 @@ namespace ProductCatalog.IntegrationTests.Infrastructure;
 
 /// <summary>Hosts the real API in memory, pointed at a test database. Two factories on the same
 /// connection string behave like two instances of the service behind a load balancer.</summary>
-public sealed class CatalogApiFactory(string connectionString, bool seedSampleData = true) : WebApplicationFactory<Program>
+/// <param name="configure">Optional per-test overrides, applied after the defaults.</param>
+public sealed class CatalogApiFactory(
+    string connectionString,
+    bool seedSampleData = true,
+    Action<IWebHostBuilder>? configure = null) : WebApplicationFactory<Program>
 {
     public string ConnectionString { get; } = connectionString;
 
@@ -16,6 +20,7 @@ public sealed class CatalogApiFactory(string connectionString, bool seedSampleDa
         builder.UseSetting("Database:ApplyMigrationsOnStartup", "true");
         builder.UseSetting("Database:SeedSampleData", seedSampleData.ToString());
         builder.UseSetting("RateLimiting:PermitPerMinute", "100000");
+        configure?.Invoke(builder);
     }
 }
 

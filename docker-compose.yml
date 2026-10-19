@@ -23,6 +23,8 @@ services:
       Database__ApplyMigrationsOnStartup: "true"
       Database__SeedSampleData: "true"
       Cors__AllowedOrigins__0: "http://localhost:4200"
+      # Only nginx (fixed address below) may tell the API who the client is via X-Forwarded-For.
+      ForwardedHeaders__KnownProxies__0: "172.28.10.10"
     ports:
       - "5080:8080"
     depends_on:
@@ -33,5 +35,18 @@ services:
     build: ./frontend
     ports:
       - "4200:8080"
+    networks:
+      default:
+        ipv4_address: 172.28.10.10
     depends_on:
       - api
+
+# Fixed subnet so the proxy has a known address the API can trust.
+# Other containers get addresses from ip_range only, so none of them can ever be handed the proxy's.
+# If it overlaps with a network you already have, change the addresses here and above.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.10.0/24
+          ip_range: 172.28.10.128/25
