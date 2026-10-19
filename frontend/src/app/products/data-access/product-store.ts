@@ -91,6 +91,8 @@ export class ProductStore {
   readonly status = computed(() => this.state().status);
   readonly error = computed(() => this.state().error);
   readonly lastUpdated = computed(() => this.state().lastUpdated);
+  /** CSV download of everything the current filters match, in the current order (all pages). */
+  readonly exportUrl = computed(() => this.api.exportUrl(this.filters(), this.sort()));
   readonly hasActiveFilters = computed(() => {
     const f = this.filters();
     return f.name.trim() !== '' || f.minStock !== null || f.maxStock !== null;

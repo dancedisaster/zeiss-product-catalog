@@ -20,6 +20,7 @@ import {
   schema,
 } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
+import { HasUnsavedChanges } from '../../../core/navigation/unsaved-changes.guard';
 import { NotificationService } from '../../../core/notifications/notification.service';
 import { ProductStore } from '../../data-access/product-store';
 import { Category, Product } from '../../models/product';
@@ -56,13 +57,33 @@ const productSchema = schema<ProductFormModel>((p) => {
   required(p.categoryId, { message: 'Choose a category.' });
 });
 
+/** The form's starting point: the loaded product, or an empty form for a new one. */
+function toModel(product: Product | undefined): ProductFormModel {
+  return product
+    ? {
+        name: product.name,
+        description: product.description ?? '',
+        sku: product.sku,
+        price: product.price,
+        stock: product.stock,
+        categoryId: String(product.categoryId),
+      }
+    : EMPTY_MODEL;
+}
+
+function sameValues(a: ProductFormModel, b: ProductFormModel): boolean {
+  return (Object.keys(a) as (keyof ProductFormModel)[]).every((key) => Object.is(a[key], b[key]));
+}
+
 @Component({
   selector: 'app-product-form-page',
   imports: [FormField, FormRoot, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-form-page.html',
+  // Closing or reloading the tab bypasses the router, so the browser has to be asked as well.
+  host: { '(window:beforeunload)': 'onBeforeUnload($event)' },
 })
-export class ProductFormPage {
+export class ProductFormPage implements HasUnsavedChanges {
   private readonly store = inject(ProductStore);
   private readonly router = inject(Router);
   private readonly notifications = inject(NotificationService);
@@ -79,23 +100,24 @@ export class ProductFormPage {
     this.id() ? `/api/products/${this.id()}` : undefined,
   );
 
+  private readonly baseline = computed(() => toModel(this.product.value()));
+
   /** Writable form model that resets whenever a (different) product is loaded. */
-  protected readonly model = linkedSignal<ProductFormModel>(() => {
-    const product = this.product.value();
-    return product
-      ? {
-          name: product.name,
-          description: product.description ?? '',
-          sku: product.sku,
-          price: product.price,
-          stock: product.stock,
-          categoryId: String(product.categoryId),
-        }
-      : EMPTY_MODEL;
-  });
+  protected readonly model = linkedSignal<ProductFormModel>(() => this.baseline());
 
   /** Set when someone else saved this product after it was loaded here. */
   protected readonly conflict = signal(false);
+
+  /** Set once the changes are stored, so leaving the page afterwards does not ask. */
+  private readonly saved = signal(false);
+
+  /**
+   * True when the form differs from what it started with. Values are compared, not keystrokes:
+   * typing a change and undoing it leaves nothing to lose.
+   */
+  readonly hasUnsavedChanges = computed(
+    () => !this.saved() && !sameValues(this.model(), this.baseline()),
+  );
 
   protected readonly productForm = form(this.model, productSchema, {
     submission: {
@@ -119,6 +141,7 @@ export class ProductFormPage {
           : await this.store.create({ ...details, stock: value.stock });
 
         if (result.ok) {
+          this.saved.set(true);
           this.notifications.success(`${result.value.name} saved (#${result.value.id}).`);
           await this.router.navigate(['/products']);
           return undefined;
@@ -154,5 +177,13 @@ export class ProductFormPage {
   protected loadLatest(): void {
     this.conflict.set(false);
     this.product.reload();
+  }
+
+  /** Asking the browser to confirm: modern browsers react to preventDefault, older ones to returnValue. */
+  protected onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.hasUnsavedChanges()) {
+      event.preventDefault();
+      event.returnValue = true;
+    }
   }
 }

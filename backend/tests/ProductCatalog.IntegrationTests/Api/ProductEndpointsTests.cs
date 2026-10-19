@@ -247,6 +247,21 @@ public class ProductEndpointsTests(ApiFixture fixture) : IClassFixture<ApiFixtur
     }
 
     [Fact]
+    public async Task Export_keeps_text_a_spreadsheet_would_run_as_a_formula_inert_and_quotes_what_needs_it()
+    {
+        await _api.CreateOkAsync(ProductApi.NewProduct(name: "=HYPERLINK(\"http://example.test\",\"Click\")") with
+        {
+            Description = "Line one,\r\nline \"two\"",
+        });
+
+        var csv = await _api.Http.GetStringAsync("/api/products/export?name=HYPERLINK");
+
+        // A leading apostrophe keeps the formula as text; quotes are doubled; the comma and line break stay inside quotes.
+        Assert.Contains("\"'=HYPERLINK(\"\"http://example.test\"\",\"\"Click\"\")\"", csv, StringComparison.Ordinal);
+        Assert.Contains("\"Line one,\r\nline \"\"two\"\"\"", csv, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Search_treats_sql_wildcards_literally()
     {
         Assert.Empty(await _api.ListAsync("/search?name=%25"));

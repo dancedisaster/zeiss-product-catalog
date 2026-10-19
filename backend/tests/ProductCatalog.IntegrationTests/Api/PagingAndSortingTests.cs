@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using ProductCatalog.Application.Products;
 using ProductCatalog.IntegrationTests.Infrastructure;
 
@@ -69,6 +70,8 @@ public class PagingAndSortingTests(ApiFixture fixture) : IClassFixture<ApiFixtur
     }
 
     [Theory]
+    [InlineData("/api/products/export?sortBy=colour", "sortBy")]
+    [InlineData("/api/products/export?min=-1", "min")]
     [InlineData("/api/products?pageSize=101", "pageSize")]
     [InlineData("/api/products?page=0", "page")]
     [InlineData("/api/products?sortBy=colour", "sortBy")]
@@ -109,6 +112,36 @@ public class PagingAndSortingTests(ApiFixture fixture) : IClassFixture<ApiFixtur
 
         Assert.Equal(new ProductSummary(ProductCount: SeededProducts, UnitsInStock: 3_423, LowStock: 2, OutOfStock: 1), summary);
     }
+
+    [Fact]
+    public async Task The_export_is_a_csv_download_of_every_product_never_paged()
+    {
+        var response = await _http.GetAsync("/api/products/export?page=1&pageSize=5");
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        var lines = CsvLines(bytes);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
+        Assert.Equal("attachment", response.Content.Headers.ContentDisposition!.DispositionType);
+        Assert.Matches(@"^products-\d{4}-\d{2}-\d{2}\.csv$", response.Content.Headers.ContentDisposition.FileNameStar);
+        Assert.Equal([0xEF, 0xBB, 0xBF], bytes[..3]); // UTF-8 byte order mark, so Excel reads the encoding right
+        Assert.Equal("Id,Name,SKU,Category,Price,Stock,Description,UpdatedAt", lines[0]);
+        Assert.Equal(SeededProducts + 1, lines.Length);
+    }
+
+    [Fact]
+    public async Task The_export_uses_the_filters_and_order_of_the_list()
+    {
+        var lines = CsvLines(await _http.GetByteArrayAsync("/api/products/export?name=smartlife&sortBy=price&sortDir=desc"));
+
+        Assert.Equal(["SmartLife Progressive 1.60", "SmartLife Single Vision 1.50"], lines.Skip(1).Select(l => l.Split(',')[1]));
+        Assert.Contains(",289.00,120,", lines[1], StringComparison.Ordinal); // invariant number format, whatever the server culture
+    }
+
+    /// <summary>The seeded data has no line breaks inside values, so a plain split finds the rows.</summary>
+    private static string[] CsvLines(byte[] csv)
+        => new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetString(csv).TrimStart('﻿')
+            .Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
 
     private async Task<(List<ProductDto> Products, int Total)> GetPageAsync(string url)
     {

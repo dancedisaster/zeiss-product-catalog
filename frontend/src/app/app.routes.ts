@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from './core/navigation/unsaved-changes.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'products' },
@@ -13,12 +14,14 @@ export const routes: Routes = [
     title: 'New product · ZEISS Product Catalog',
     loadComponent: () =>
       import('./products/pages/product-form-page/product-form-page').then((m) => m.ProductFormPage),
+    canDeactivate: [unsavedChangesGuard],
   },
   {
     path: 'products/:id/edit',
     title: 'Edit product · ZEISS Product Catalog',
     loadComponent: () =>
       import('./products/pages/product-form-page/product-form-page').then((m) => m.ProductFormPage),
+    canDeactivate: [unsavedChangesGuard],
   },
   { path: '**', redirectTo: 'products' },
 ];

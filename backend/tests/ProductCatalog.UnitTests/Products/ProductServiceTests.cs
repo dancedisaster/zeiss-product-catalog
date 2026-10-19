@@ -219,6 +219,50 @@ public class ProductServiceTests
         Assert.Equal(["min", "pageSize"], result.Error!.ValidationErrors!.Keys.Order());
     }
 
+    // ---- Export ----
+
+    [Fact]
+    public void Export_reports_every_invalid_filter_before_anything_is_read()
+    {
+        var result = _service.Export(new string('x', 101), -1, null, new ListOptions(SortBy: "colour"));
+
+        Assert.Equal(["min", "name", "sortBy"], result.Error!.ValidationErrors!.Keys.Order());
+    }
+
+    [Theory]
+    [InlineData(null, 0, ProductSortColumn.Stock)] // a stock range alone: ordered like /stock-level
+    [InlineData("lens", 0, ProductSortColumn.Name)] // a name search: ordered like /search
+    [InlineData(null, null, ProductSortColumn.Name)] // nothing: ordered like the full list
+    public async Task Export_uses_the_same_default_order_as_the_list_being_viewed(string? name, int? min, ProductSortColumn expected)
+    {
+        _products.StreamAsync(Arg.Any<ProductFilter>(), Arg.Any<ProductOrder>()).Returns(Stream(TestData.Product()));
+
+        var exported = await ToListAsync(_service.Export(name, min, null, ListOptions.None).Value);
+
+        Assert.Single(exported);
+        _products.Received(1).StreamAsync(new ProductFilter(name, min, null), new ProductOrder(expected));
+    }
+
+    private static async IAsyncEnumerable<Product> Stream(params Product[] items)
+    {
+        foreach (var item in items)
+        {
+            await Task.Yield();
+            yield return item;
+        }
+    }
+
+    private static async Task<List<T>> ToListAsync<T>(IAsyncEnumerable<T> items)
+    {
+        var list = new List<T>();
+        await foreach (var item in items)
+        {
+            list.Add(item);
+        }
+
+        return list;
+    }
+
     private void ReturnsFromQuery(params Product[] items)
         => _products.QueryAsync(Arg.Any<ProductFilter>(), Arg.Any<ProductOrder>(), Arg.Any<PageRequest?>(), Arg.Any<CancellationToken>())
             .Returns(new ProductQueryResult(items, items.Length));
