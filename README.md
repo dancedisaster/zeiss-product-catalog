@@ -180,8 +180,8 @@ My part was to steer and check the work:
 - **Verification.** Every change comes with tests: unit tests, integration tests against a real SQL Server, BDD
   scenarios and Angular tests. Reported bugs were first reproduced with a failing test, then fixed. I ran the
   application locally (Docker, and against SQL Server Express), and the quick start was checked from a clean clone.
-- **Changes in small steps.** After the first version, changes went through pull requests, so the history shows how
-  the project evolved.
+- **Changes in small steps.** After the first version, changes were made in commits and pull requests, so the history
+  shows how the project evolved.
 
 ## Next steps (with more time)
 
