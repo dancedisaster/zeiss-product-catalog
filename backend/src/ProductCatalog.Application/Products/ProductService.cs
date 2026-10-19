@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 using ProductCatalog.Application.Abstractions;
@@ -63,6 +64,26 @@ internal sealed partial class ProductService(
 
     public Task<ProductSummary> GetSummaryAsync(CancellationToken cancellationToken)
         => products.GetSummaryAsync(cancellationToken);
+
+    public Result<IAsyncEnumerable<ProductDto>> Export(string? name, int? min, int? max, ListOptions options)
+    {
+        var errors = StockRangeErrors(min, max);
+        if (name?.Length > SearchTermMaxLength)
+        {
+            errors["name"] = [$"The search term must be at most {SearchTermMaxLength} characters."];
+        }
+
+        // Same default order as the list the user is looking at: by stock for a stock range alone, otherwise by name.
+        var term = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        var defaultOrder = term is null && (min is not null || max is not null) ? ByStock : ByName;
+        var order = ReadOrder(options, defaultOrder, errors);
+        if (errors.Count > 0)
+        {
+            return Error.Validation(errors);
+        }
+
+        return Result<IAsyncEnumerable<ProductDto>>.Success(StreamDtosAsync(new ProductFilter(term, min, max), order));
+    }
 
     public async Task<Result<ProductDto>> CreateAsync(CreateProductRequest request, CancellationToken cancellationToken)
     {
@@ -236,6 +257,15 @@ internal sealed partial class ProductService(
 
         var result = await products.QueryAsync(filter, order, page, cancellationToken);
         return new ProductPage(result.Items.ToDtos(), result.TotalCount);
+    }
+
+    private async IAsyncEnumerable<ProductDto> StreamDtosAsync(
+        ProductFilter filter, ProductOrder order, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var product in products.StreamAsync(filter, order).WithCancellation(cancellationToken))
+        {
+            yield return product.ToDto();
+        }
     }
 
     private static ProductOrder ReadOrder(ListOptions options, ProductOrder defaultOrder, Dictionary<string, string[]> errors)

@@ -14,6 +14,9 @@ public interface IProductRepository
     /// </summary>
     Task<ProductQueryResult> QueryAsync(ProductFilter filter, ProductOrder order, PageRequest? page, CancellationToken cancellationToken);
 
+    /// <summary>Every product matching <paramref name="filter"/>, in order, read one by one as the caller consumes them.</summary>
+    IAsyncEnumerable<Product> StreamAsync(ProductFilter filter, ProductOrder order);
+
     /// <summary>Catalogue-wide counts for the dashboard, computed by the database in one query.</summary>
     Task<ProductSummary> GetSummaryAsync(CancellationToken cancellationToken);
 

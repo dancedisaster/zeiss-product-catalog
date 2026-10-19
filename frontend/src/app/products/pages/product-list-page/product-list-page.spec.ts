@@ -55,4 +55,33 @@ describe('ProductListPage', () => {
     expect(notice()).toBeNull();
     http.verify();
   });
+
+  it('offers what is on screen as a CSV download, following the chosen order', () => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(ProductListPage);
+    const page = fixture.nativeElement as HTMLElement;
+    const answer = () => {
+      http.expectOne('/api/products/summary').flush(summary);
+      http
+        .expectOne((r) => r.url === '/api/products')
+        .flush([product], { headers: { 'X-Total-Count': '1' } });
+      fixture.detectChanges();
+    };
+    const exportLink = () => page.querySelector<HTMLAnchorElement>('a[download]')!;
+
+    answer();
+    expect(exportLink().getAttribute('href')).toBe('/api/products/export');
+
+    // A new order reloads the page only; the catalogue summary cannot change with it.
+    page.querySelectorAll<HTMLButtonElement>('[role="columnheader"] button')[2].click(); // Price
+    http
+      .expectOne((r) => r.url === '/api/products')
+      .flush([product], { headers: { 'X-Total-Count': '1' } });
+    fixture.detectChanges();
+    expect(exportLink().getAttribute('href')).toBe('/api/products/export?sortBy=price&sortDir=asc');
+    http.verify();
+  });
 });

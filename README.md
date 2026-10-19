@@ -88,10 +88,10 @@ npm test -- --watch=false
 
 | Suite | What it covers |
 |---|---|
-| `ProductCatalog.UnitTests` (70) | Domain invariants, validators (including missing fields), every branch of `ProductService` with mocked ports, paging and sorting parameters |
-| `ProductCatalog.IntegrationTests` (50) | All 9 endpoints over HTTP against a real SQL Server in Docker (Testcontainers): status codes, problem details, missing fields, stale edits, updates without a version, paging and sorting across pages, the summary, search escaping, security headers, per-client rate limiting behind the proxy, request timeouts (also inside a SQL command; writes exempt), request logging (fields, traceId, no headers). Two in-memory API instances on one database prove unique ids and no overselling under parallel load |
+| `ProductCatalog.UnitTests` (74) | Domain invariants, validators (including missing fields), every branch of `ProductService` with mocked ports, paging and sorting parameters, export filters and default order |
+| `ProductCatalog.IntegrationTests` (55) | All 9 endpoints over HTTP against a real SQL Server in Docker (Testcontainers): status codes, problem details, missing fields, stale edits, updates without a version, paging and sorting across pages, the summary, search escaping, security headers, per-client rate limiting behind the proxy, request timeouts (also inside a SQL command; writes exempt), request logging (fields, traceId, no headers), the CSV export (headers, filters and order, formula injection, quoting). Two in-memory API instances on one database prove unique ids and no overselling under parallel load |
 | BDD (`Features/*.feature`, 7 scenarios) | Stock management and product discovery written in Gherkin (Reqnroll) |
-| Angular (39) | Store behaviour (endpoint selection, paging and sorting parameters, back to the last page that exists, optimistic delete with server reconciliation after every outcome, overlapping deletion failures, server-truth updates, summary (not reloaded by paging, sorting or filtering), reload after a stock change under a stock filter or sort, no stale reply undoing a mutation, failed refreshes flagged), error mapping, stock badge, paginator, sortable list headers and menu, list page warning for out-of-date data, edit form (sends the loaded version, explains a conflict) |
+| Angular (48) | Store behaviour (endpoint selection, paging and sorting parameters, back to the last page that exists, optimistic delete with server reconciliation after every outcome, overlapping deletion failures, server-truth updates, summary (not reloaded by paging, sorting or filtering), reload after a stock change under a stock filter or sort, no stale reply undoing a mutation, failed refreshes flagged), error mapping, stock badge, paginator, sortable list headers and menu, list page warning for out-of-date data, CSV export link for the current view, edit form (sends the loaded version, explains a conflict, unsaved-change detection and tab-close prompt), unsaved-changes guard |
 
 ## API
 
@@ -99,6 +99,7 @@ npm test -- --watch=false
 |---|---|---|
 | GET | `/api/products` | 200 list (every item includes `stock`); optional paging and sorting, see below |
 | GET | `/api/products/summary` | 200 catalogue-wide counts: products, units in stock, low stock, out of stock (extra: feeds the dashboard) |
+| GET | `/api/products/export` | 200 CSV download of every product matching the optional `name`, `min`, `max`, `sortBy`, `sortDir` (never paged) / 400 (extra) |
 | GET | `/api/products/{id}` | 200 / 404 |
 | POST | `/api/products` | 201 + `Location` / 400 / 409 duplicate SKU |
 | PUT | `/api/products/{id}` | 200 / 400 / 404 / 409 duplicate SKU or stale `version` |
@@ -151,6 +152,7 @@ The full reasoning is in [docs/DECISIONS.md](docs/DECISIONS.md). In short:
 - **Validation in three layers**: Angular (UX), FluentValidation (contract), domain + DB constraints (invariants). A missing field is reported as required, never defaulted to 0.
 - **Security**: strict CSP with per-request nonce in nginx (no `unsafe-inline`), API CSP `default-src 'none'`, CORS allow-list, per-client rate limiting (client address taken from `X-Forwarded-For` only when it comes from the trusted proxy), non-root chiseled images, no stack traces in responses, NuGet audit with transitive pinning.
 - **Operations**: one log entry per request (method, path, status, duration and the `traceId` that error responses carry; never headers or bodies), and reads still running after 30 s are cancelled with a 504. Writes are exempt, since a 504 after the commit would report a stored change as failed.
+- **UI safety and export**: leaving the product form with unsaved changes asks first (route guard, plus the browser's prompt when the tab closes). "Export CSV" downloads every product matching the current filters, in the current order, streamed by the API, with values a spreadsheet would run as formulas neutralised.
 
 ## Assumptions
 
@@ -164,5 +166,6 @@ The full reasoning is in [docs/DECISIONS.md](docs/DECISIONS.md). In short:
 - Authentication/authorisation with Microsoft Entra ID (JWT bearer) and role-based policies (e.g. only warehouse roles change stock).
 - Indexes on `Name` and `Price` for sorting, and keyset (cursor) paging, once the catalogue grows large.
 - Real-time updates with SignalR instead of focus/interval refresh.
+- Bulk selection and bulk actions, with bulk endpoints that define what happens when some items fail.
 - OpenTelemetry traces/metrics to Azure Monitor; CI pipeline (build, test, `dotnet ef migrations bundle`, container scan) in Azure DevOps; deploy to AKS / Container Apps.
 - Playwright end-to-end tests in CI.

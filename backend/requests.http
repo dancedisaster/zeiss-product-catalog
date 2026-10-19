@@ -44,6 +44,10 @@ GET {{api}}/products/search?name=lens&min=1&max=1000&page=1&pageSize=10
 GET {{api}}/products/summary
 
 ###
+# CSV download of every match (never paged): same filters and sort as the list endpoints
+GET {{api}}/products/export?min=1&max=10&sortBy=price&sortDir=desc
+
+###
 DELETE {{api}}/products/100011
 
 ###

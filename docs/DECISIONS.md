@@ -256,3 +256,39 @@ stops one slow dependency from tying up the server.
 Application Insights), where each field stays searchable. The query string is logged; here it only holds search terms,
 filters and paging, but a query string carrying personal data would need redacting. 30 s is generous for this API, and
 a single endpoint can get its own limit with `.WithRequestTimeout(...)`.
+
+## 17. Unsaved changes
+
+**Decision.** A `canDeactivate` route guard (`core/navigation/unsaved-changes.guard.ts`) asks before leaving the product
+form while it holds unsaved changes; a `beforeunload` handler makes the browser ask when the tab is closed or reloaded.
+"Unsaved" compares values with what the form started from (the loaded product, or an empty form), not keystrokes, so
+typing a change and undoing it leaves nothing to lose. After a successful save, leaving does not ask; after "Load the
+latest version" the form starts clean again.
+
+**Why the browser's `confirm()`.** The list avoids blocking dialogs (delete is a two-step inline confirm), but leaving
+a page is a moment the browser owns: closing the tab can only use the browser's dialog anyway, and the guard has to
+block navigation until the user answers. The dialog sits behind an injection token (`CONFIRM`), so tests answer it
+and a custom dialog could replace it without touching the guard.
+
+## 18. CSV export
+
+**Decision.** `GET /api/products/export` takes the same optional `name`, `min`, `max`, `sortBy` and `sortDir` as the list
+endpoints (with the same default order) and returns every match as a CSV download, never paged. The UI's "Export CSV"
+is a plain link built from the current filters and sort, so the browser streams the file to disk itself.
+
+**Why on the server.** The list is paged, so the browser only holds one page; an export of "what I am looking at" has to
+come from the same query on the server. Rows are written to the response as they are read, so the file is never built
+in memory as a whole.
+
+**Format.** RFC 4180 (commas, CRLF, quotes doubled), invariant number format, ISO 8601 dates, and a UTF-8 byte order mark
+so Excel reads the encoding correctly.
+
+**CSV injection.** A spreadsheet runs a cell that starts with `=`, `+`, `-`, `@`, tab or carriage return as a formula, so
+a product named `=HYPERLINK(...)` would become a live link in whoever opens the file. Text cells starting with one of
+these get a leading apostrophe (OWASP's advice) and stay plain text; numeric columns are written as numbers.
+
+**Trade-off.** With the retrying execution strategy (`EnableRetryOnFailure`), EF Core buffers a query's rows before
+handing them out, so the database side of a very large export still holds the result set in memory; a catalogue in the
+hundreds of thousands would page through it by key instead. Excel in locales that use `;` as the list separator opens
+the file as one column per line; its "From Text/CSV" import handles it. The export gets 2 minutes instead of the default
+30 s request timeout.

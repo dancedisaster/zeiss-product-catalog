@@ -14,6 +14,12 @@ public interface IProductService
 
     Task<ProductSummary> GetSummaryAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Every product matching the optional name and stock range, in the requested order, for a download.
+    /// The filters are validated now; the products are read from the database as the caller enumerates them.
+    /// </summary>
+    Result<IAsyncEnumerable<ProductDto>> Export(string? name, int? min, int? max, ListOptions options);
+
     Task<Result<ProductDto>> CreateAsync(CreateProductRequest request, CancellationToken cancellationToken);
 
     Task<Result<ProductDto>> UpdateAsync(int id, UpdateProductRequest request, CancellationToken cancellationToken);

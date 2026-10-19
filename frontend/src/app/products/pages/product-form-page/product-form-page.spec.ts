@@ -56,6 +56,45 @@ describe('ProductFormPage (edit)', () => {
 
   const alert = () => (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
 
+  function typeName(value: string): void {
+    const input = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#name')!;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+  }
+
+  it('has nothing to lose while the form still holds what was loaded, even after a change is undone', () => {
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(false);
+
+    typeName('Renamed');
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(true);
+
+    typeName(loaded.name);
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(false);
+  });
+
+  it('asks the browser to confirm closing the tab only while there are unsaved changes', () => {
+    const closeTab = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+
+    expect(closeTab()).toBe(false);
+    typeName('Renamed');
+    expect(closeTab()).toBe(true);
+  });
+
+  it('has nothing to lose once the changes are saved, so leaving afterwards does not ask', async () => {
+    typeName('Renamed');
+    await submit();
+    http
+      .expectOne({ method: 'PUT', url: `/api/products/${loaded.id}` })
+      .flush({ ...loaded, name: 'Renamed', version: 'version-next' });
+    await settle();
+
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(false);
+  });
+
   it('sends the version it loaded, and no stock', async () => {
     await submit();
 

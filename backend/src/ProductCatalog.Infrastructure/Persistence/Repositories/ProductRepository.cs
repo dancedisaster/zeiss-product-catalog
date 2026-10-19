@@ -13,24 +13,7 @@ internal sealed class ProductRepository(CatalogDbContext db) : IProductRepositor
     public async Task<ProductQueryResult> QueryAsync(
         ProductFilter filter, ProductOrder order, PageRequest? page, CancellationToken cancellationToken)
     {
-        var matches = db.Products.AsNoTracking();
-        if (filter.Name is not null)
-        {
-            // EF Core translates Contains to a parameterised LIKE and escapes %, _ and [ in the input,
-            // so the search is injection-safe and matches literally. Case-insensitive via the default collation.
-            matches = matches.Where(p => p.Name.Contains(filter.Name));
-        }
-
-        if (filter.MinStock is { } min)
-        {
-            matches = matches.Where(p => p.Stock >= min);
-        }
-
-        if (filter.MaxStock is { } max)
-        {
-            matches = matches.Where(p => p.Stock <= max);
-        }
-
+        var matches = Matching(filter);
         var query = Sort(matches.Include(p => p.Category), order);
         if (page is null)
         {
@@ -42,6 +25,9 @@ internal sealed class ProductRepository(CatalogDbContext db) : IProductRepositor
         var items = await query.Skip(page.Skip).Take(page.PageSize).ToListAsync(cancellationToken);
         return new ProductQueryResult(items, total);
     }
+
+    public IAsyncEnumerable<Product> StreamAsync(ProductFilter filter, ProductOrder order)
+        => Sort(Matching(filter).Include(p => p.Category), order).AsAsyncEnumerable();
 
     public async Task<ProductSummary> GetSummaryAsync(CancellationToken cancellationToken)
         // One aggregate query: SELECT COUNT(*), SUM(Stock), COUNT(CASE ...) ... FROM Products.
@@ -89,6 +75,29 @@ internal sealed class ProductRepository(CatalogDbContext db) : IProductRepositor
     public void Add(Product product) => db.Products.Add(product);
 
     public void Remove(Product product) => db.Products.Remove(product);
+
+    private IQueryable<Product> Matching(ProductFilter filter)
+    {
+        var matches = db.Products.AsNoTracking();
+        if (filter.Name is not null)
+        {
+            // EF Core translates Contains to a parameterised LIKE and escapes %, _ and [ in the input,
+            // so the search is injection-safe and matches literally. Case-insensitive via the default collation.
+            matches = matches.Where(p => p.Name.Contains(filter.Name));
+        }
+
+        if (filter.MinStock is { } min)
+        {
+            matches = matches.Where(p => p.Stock >= min);
+        }
+
+        if (filter.MaxStock is { } max)
+        {
+            matches = matches.Where(p => p.Stock <= max);
+        }
+
+        return matches;
+    }
 
     private static IQueryable<Product> Sort(IQueryable<Product> query, ProductOrder order)
     {

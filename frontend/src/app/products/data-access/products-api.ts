@@ -5,7 +5,9 @@ import {
   CreateProductRequest,
   ListParams,
   Product,
+  ProductFilters,
   ProductPage,
+  ProductSort,
   ProductSummary,
   UpdateProductRequest,
 } from '../models/product';
@@ -72,6 +74,19 @@ export class ProductsApi {
 
   summary(): Observable<ProductSummary> {
     return this.http.get<ProductSummary>(`${this.baseUrl}/summary`);
+  }
+
+  /**
+   * Where to download the CSV of every product matching these filters, in this order (never paged).
+   * A plain URL: the browser streams the file to disk itself, so it never has to fit in memory here.
+   */
+  exportUrl(filters: ProductFilters, sort: ProductSort | null): string {
+    let params = withStockRange(new HttpParams(), filters.minStock, filters.maxStock);
+    const name = filters.name.trim();
+    if (name) params = params.set('name', name);
+    if (sort) params = params.set('sortBy', sort.column).set('sortDir', sort.direction);
+    const query = params.toString();
+    return query ? `${this.baseUrl}/export?${query}` : `${this.baseUrl}/export`;
   }
 
   private getPage(url: string, params: HttpParams): Observable<ProductPage> {
