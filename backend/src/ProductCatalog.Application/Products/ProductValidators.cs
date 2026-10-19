@@ -30,7 +30,8 @@ public sealed class UpdateProductRequestValidator : AbstractValidator<UpdateProd
         RuleFor(x => x.Sku).ValidSku();
         RuleFor(x => x.Price).Required().ValidPrice();
         RuleFor(x => x.CategoryId).Required().GreaterThan(0);
-        RuleFor(x => x.Version).NotEmpty().WithMessage(ProductRuleExtensions.RequiredMessage);
+        // Optional, so clients written to the original contract keep working (see ProductService.UpdateAsync).
+        RuleFor(x => x.Version).NotEqual(Guid.Empty).WithMessage("'Version' must be the version returned with the product.");
     }
 }
 

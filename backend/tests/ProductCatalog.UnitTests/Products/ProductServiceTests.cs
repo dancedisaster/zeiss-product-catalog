@@ -264,6 +264,31 @@ public class ProductServiceTests
     }
 
     [Fact]
+    public async Task Update_without_a_version_applies_to_the_current_details()
+    {
+        var product = TestData.Product();
+        _products.GetByIdAsync(product.Id, Arg.Any<CancellationToken>()).Returns(product);
+
+        var result = await _service.UpdateAsync(product.Id, TestData.UpdateRequest(Guid.NewGuid()) with { Version = null }, CancellationToken.None);
+
+        Assert.Equal("Renamed product", result.Value.Name);
+        await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Update_returns_the_stock_as_stored_after_the_save_not_as_loaded()
+    {
+        var product = TestData.Product(stock: 4);
+        _products.GetByIdAsync(product.Id, Arg.Any<CancellationToken>()).Returns(product);
+        // A sale committed while the update was running; it does not change the version, so the save succeeds.
+        _products.GetStockAsync(product.Id, Arg.Any<CancellationToken>()).Returns(1);
+
+        var result = await _service.UpdateAsync(product.Id, TestData.UpdateRequest(product.Version), CancellationToken.None);
+
+        Assert.Equal(1, result.Value.Stock);
+    }
+
+    [Fact]
     public async Task Update_that_loses_a_concurrency_race_is_a_conflict()
     {
         var product = TestData.Product();

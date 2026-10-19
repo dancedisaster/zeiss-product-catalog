@@ -4,6 +4,8 @@ obj/
 TestResults/
 *.user
 .vs/
+# Reqnroll generates the feature code-behind on every build, with the OS's line breaks in the descriptions.
+*.feature.cs
 
 # Node / Angular
 node_modules/

@@ -125,9 +125,10 @@ internal sealed partial class ProductService(
             return ProductNotFound(id);
         }
 
-        // The client sends the version it loaded. A different one means someone else saved the
-        // details since then, and applying this update would silently overwrite their change.
-        if (product.Version != request.Version)
+        // A client that sends the version it loaded is protected: a different one means someone else saved the details
+        // since then, and applying this update would silently overwrite their change. A client written to the original
+        // contract sends none, and its update applies to the current details, as it always did.
+        if (request.Version is { } loadedVersion && product.Version != loadedVersion)
         {
             return ConcurrentUpdate(id);
         }
@@ -159,7 +160,10 @@ internal sealed partial class ProductService(
             return ConcurrentUpdate(id);
         }
 
-        return product.ToDto();
+        // A stock movement that committed after our read does not change the version, so the save did not conflict,
+        // and the stock we loaded may be out of date. Read it again so the response shows what is really available.
+        var stock = await products.GetStockAsync(id, cancellationToken);
+        return product.ToDto() with { Stock = stock ?? product.Stock };
     }
 
     public async Task<Result> DeleteAsync(int id, CancellationToken cancellationToken)

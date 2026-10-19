@@ -63,6 +63,9 @@ internal sealed class ProductRepository(CatalogDbContext db) : IProductRepositor
             cancellationToken);
     }
 
+    public Task<int?> GetStockAsync(int id, CancellationToken cancellationToken)
+        => db.Products.Where(p => p.Id == id).Select(p => (int?)p.Stock).FirstOrDefaultAsync(cancellationToken);
+
     public async Task<bool> TryChangeStockAsync(int id, int delta, DateTimeOffset now, CancellationToken cancellationToken)
     {
         // UPDATE ... SET Stock = Stock + @delta WHERE Id = @id AND <result in range>

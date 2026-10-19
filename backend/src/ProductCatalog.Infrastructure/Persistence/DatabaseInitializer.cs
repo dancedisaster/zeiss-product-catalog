@@ -20,6 +20,10 @@ public sealed partial class DatabaseInitializer(
         IF @result < 0 THROW 50000, 'Could not acquire the seeding lock.', 1;
         """;
 
+    // SqlClient abandons a command after 30 s by default, which would end the wait before the 60 s @LockTimeout does:
+    // the instance would crash at start-up instead of waiting. The command gets longer than the lock.
+    private static readonly TimeSpan SeedLockCommandTimeout = TimeSpan.FromSeconds(90);
+
     public async Task InitialiseAsync(bool seedSampleData, CancellationToken cancellationToken = default)
     {
         // EF Core takes its own lock while migrating, once the database exists. Creating the database is not
@@ -41,7 +45,16 @@ public sealed partial class DatabaseInitializer(
     {
         db.ChangeTracker.Clear(); // a retried attempt must not re-insert what a failed one added
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        await db.Database.ExecuteSqlRawAsync(AcquireSeedLock, cancellationToken);
+        var commandTimeout = db.Database.GetCommandTimeout();
+        db.Database.SetCommandTimeout(SeedLockCommandTimeout);
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(AcquireSeedLock, cancellationToken);
+        }
+        finally
+        {
+            db.Database.SetCommandTimeout(commandTimeout);
+        }
 
         if (await db.Products.AnyAsync(cancellationToken))
         {

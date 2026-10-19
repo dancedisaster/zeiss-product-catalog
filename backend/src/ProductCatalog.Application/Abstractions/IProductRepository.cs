@@ -19,6 +19,9 @@ public interface IProductRepository
 
     Task<bool> SkuExistsAsync(string sku, int? excludingProductId, CancellationToken cancellationToken);
 
+    /// <summary>The stock as stored now, read from the database even if the product is tracked; null if it does not exist.</summary>
+    Task<int?> GetStockAsync(int id, CancellationToken cancellationToken);
+
     /// <summary>
     /// Atomically adds <paramref name="delta"/> (negative to remove) to the stock, only if the result
     /// stays between 0 and int.MaxValue. Returns false when the product does not exist or the

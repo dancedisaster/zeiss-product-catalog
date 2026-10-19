@@ -12,7 +12,7 @@ import {
   switchMap,
   tap,
 } from 'rxjs';
-import { ApiError, toApiError } from '../../core/http/api-error';
+import { ApiError, isOutcomeUnknown, toApiError } from '../../core/http/api-error';
 import {
   CreateProductRequest,
   EMPTY_FILTERS,
@@ -52,8 +52,10 @@ export type MutationResult<T = void> = { ok: true; value: T } | { ok: false; err
  * - Every mutation writes the server's response back into the state, so the UI always shows
  *   what the API actually stored (e.g. the real stock after a decrement). A list request already on its
  *   way when a mutation finishes is restarted, so its older snapshot can never undo the change.
- * - The KPI summary is catalogue-wide and comes from its own endpoint, reloaded with every page and
- *   after each stock change.
+ * - A mutation that got no answer, or a server error, may still have been applied, so it is never rolled
+ *   back on trust: the page is reloaded instead.
+ * - The KPI summary is catalogue-wide and comes from its own endpoint. It is reloaded on refresh and after
+ *   changes that affect it, but not when paging, sorting or filtering, since those leave it unchanged.
  * - When a refresh fails, the last data stays on screen and `stale` says so; it is never silently passed off as current.
  */
 @Injectable({ providedIn: 'root' })
@@ -109,7 +111,6 @@ export class ProductStore {
         tap(() => {
           this.loadInFlight = true;
           this.state.update((s) => ({ ...s, status: 'loading' }));
-          this.summaryReload$.next();
         }),
         switchMap(({ filters, params }) =>
           this.query(filters, params).pipe(
@@ -166,16 +167,18 @@ export class ProductStore {
   setSort(sort: ProductSort | null): void {
     this.sortState.set(sort);
     this.pageState.set(1);
-    this.refresh();
+    this.reload$.next();
   }
 
   goToPage(page: number): void {
     this.pageState.set(Math.max(1, page));
-    this.refresh();
+    this.reload$.next();
   }
 
+  /** Loads the page and the summary again: on request, on a timer, when the tab comes back, or after a change. */
   refresh(): void {
     this.reload$.next();
+    this.summaryReload$.next();
   }
 
   async create(request: CreateProductRequest): Promise<MutationResult<Product>> {
@@ -193,13 +196,16 @@ export class ProductStore {
     return result;
   }
 
-  /** Optimistic: the row disappears at once and comes back if the API refuses. */
+  /**
+   * Optimistic: the row disappears at once, and comes back only if the API refused the delete. If it was already
+   * deleted elsewhere (404), or the outcome is unknown, the page is reloaded instead.
+   */
   async remove(product: Product): Promise<MutationResult> {
     const previous = this.state().products;
     this.patchProducts((products) => products.filter((p) => p.id !== product.id));
 
     const result = await this.run(this.api.delete(product.id));
-    if (result.ok) {
+    if (result.ok || result.error.status === 404 || isOutcomeUnknown(result.error)) {
       this.refresh(); // the next product moves up into this page, and the total and summary change
     } else {
       this.patchProducts(() => previous);
@@ -227,8 +233,9 @@ export class ProductStore {
       // Deleted elsewhere: drop it at once, then reload so the next product moves up and the total is right.
       this.patchProducts((products) => products.filter((p) => p.id !== product.id));
       this.refresh();
-    } else if (result.error.status === 409) {
-      this.refresh(); // someone else changed the stock: show the real value
+    } else if (result.error.status === 409 || isOutcomeUnknown(result.error)) {
+      // Someone else changed the stock, or this change may have been applied without an answer: show the real value.
+      this.refresh();
     }
     return result;
   }
@@ -236,15 +243,12 @@ export class ProductStore {
   /**
    * Runs once a mutation is applied locally. A list request already on its way may have read the data before the
    * mutation committed; its reply would undo the change. Restarting it lets switchMap drop that reply (the request is
-   * aborted) and read again after the commit. A reload refreshes the summary too; otherwise refresh it alone if needed.
-   * With no request in flight nothing is reloaded, so a stock change costs no extra list request.
+   * aborted) and read again after the commit. With no request in flight nothing is reloaded, so a stock change costs
+   * no extra list request. The summary is reloaded only if the mutation changed it.
    */
   private afterMutation({ summaryChanged }: { summaryChanged: boolean }): void {
-    if (this.loadInFlight) {
-      this.refresh();
-    } else if (summaryChanged) {
-      this.summaryReload$.next();
-    }
+    if (this.loadInFlight) this.reload$.next();
+    if (summaryChanged) this.summaryReload$.next();
   }
 
   /** A stock change can only change the result (which products, in what order) under a stock filter or a stock sort. */

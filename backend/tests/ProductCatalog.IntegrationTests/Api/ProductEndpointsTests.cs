@@ -120,11 +120,24 @@ public class ProductEndpointsTests(ApiFixture fixture) : IClassFixture<ApiFixtur
     }
 
     [Fact]
-    public async Task Put_without_the_loaded_version_is_a_bad_request()
+    public async Task Put_without_a_version_updates_the_current_details_as_in_the_original_contract()
+    {
+        var created = await _api.CreateOkAsync(ProductApi.NewProduct());
+        Assert.Equal(HttpStatusCode.OK, (await _api.UpdateAsync(created.Id, ProductApi.EditOf(created) with { Name = "First edit" })).StatusCode);
+
+        var response = await _api.UpdateAsync(created.Id, ProductApi.EditOf(created) with { Name = "No version", Version = null });
+        var updated = await response.Content.ReadFromJsonAsync<ProductDto>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("No version", updated!.Name);
+    }
+
+    [Fact]
+    public async Task Put_with_an_empty_version_is_a_bad_request()
     {
         var created = await _api.CreateOkAsync(ProductApi.NewProduct());
 
-        var response = await _api.UpdateAsync(created.Id, ProductApi.EditOf(created) with { Version = null });
+        var response = await _api.UpdateAsync(created.Id, ProductApi.EditOf(created) with { Version = Guid.Empty });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ValidationProblem>();

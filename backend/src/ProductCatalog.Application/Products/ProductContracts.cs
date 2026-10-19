@@ -49,6 +49,7 @@ public sealed record CreateProductRequest(
 /// it only changes through the add-to-stock / decrement-stock operations, so an edit form
 /// holding a stale stock value can never overwrite a concurrent stock movement.
 /// <see cref="Version"/> is the version the client loaded; if someone else saved in between, the update is a conflict.
+/// It is optional, as the original contract has no such field: without it the update applies to the current details.
 /// </summary>
 public sealed record UpdateProductRequest(
     string Name,

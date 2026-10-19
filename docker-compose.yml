@@ -42,9 +42,11 @@ services:
       - api
 
 # Fixed subnet so the proxy has a known address the API can trust.
-# If it overlaps with a network you already have, change both addresses above.
+# Other containers get addresses from ip_range only, so none of them can ever be handed the proxy's.
+# If it overlaps with a network you already have, change the addresses here and above.
 networks:
   default:
     ipam:
       config:
         - subnet: 172.28.10.0/24
+          ip_range: 172.28.10.128/25

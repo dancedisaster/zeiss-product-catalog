@@ -73,10 +73,21 @@ public class ProductValidatorTests
     }
 
     [Fact]
-    public void An_empty_update_request_reports_each_missing_field_including_the_version()
+    public void An_empty_update_request_reports_each_missing_field()
     {
         var result = _update.Validate(new UpdateProductRequest(null!, null, null!, null, null, null));
 
-        Assert.Equal(["CategoryId", "Name", "Price", "Sku", "Version"], result.Errors.Select(e => e.PropertyName).Order());
+        Assert.Equal(["CategoryId", "Name", "Price", "Sku"], result.Errors.Select(e => e.PropertyName).Order());
+    }
+
+    [Fact]
+    public void An_update_request_without_a_version_is_valid_as_in_the_original_contract()
+        => Assert.True(_update.Validate(TestData.UpdateRequest(Guid.NewGuid()) with { Version = null }).IsValid);
+
+    [Fact]
+    public void An_update_request_with_an_empty_version_is_invalid()
+    {
+        var result = _update.Validate(TestData.UpdateRequest(Guid.Empty));
+        Assert.Equal("Version", Assert.Single(result.Errors).PropertyName);
     }
 }

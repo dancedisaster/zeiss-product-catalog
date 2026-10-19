@@ -15,6 +15,7 @@ Content-Type: application/json
 
 ###
 # Send the version from the GET above (run it first). Sending this twice returns 409: the version is stale.
+# Without "version" (as in the original contract) the update applies to whatever is current.
 PUT {{api}}/products/100000
 Content-Type: application/json
 

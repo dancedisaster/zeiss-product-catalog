@@ -2,9 +2,12 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ProductCatalog.Application.Abstractions;
 using ProductCatalog.Application.Categories;
+using ProductCatalog.Infrastructure.Persistence;
 using ProductCatalog.IntegrationTests.Infrastructure;
 
 namespace ProductCatalog.IntegrationTests.Api;
@@ -26,6 +29,33 @@ public class RequestPipelineTests
 
         Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType!.MediaType);
+    }
+
+    [Fact]
+    public async Task A_sql_command_cut_short_by_the_timeout_is_answered_with_504_too()
+    {
+        var connectionString = await SqlServerContainer.CreateDatabaseConnectionStringAsync();
+        await using var api = new CatalogApiFactory(connectionString, seedSampleData: false, host => host
+            .UseSetting("RequestTimeouts:Default", "00:00:00.500")
+            .ConfigureTestServices(services => services.AddScoped<ICategoryService, SlowQueryCategoryService>()));
+
+        var response = await api.CreateClient().GetAsync("/api/categories");
+
+        Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType!.MediaType);
+    }
+
+    [Fact]
+    public async Task Writes_are_not_cut_short_by_the_timeout()
+    {
+        var connectionString = await SqlServerContainer.CreateDatabaseConnectionStringAsync();
+        await using var api = new CatalogApiFactory(connectionString, seedSampleData: false, host => host
+            .UseSetting("RequestTimeouts:Default", "00:00:00.200")
+            .ConfigureTestServices(services => services.AddScoped<IUnitOfWork, SlowUnitOfWork>()));
+
+        var response = await new ProductApi(api.CreateClient()).CreateAsync(ProductApi.NewProduct());
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     [Fact]
@@ -90,6 +120,26 @@ public class RequestPipelineTests
         {
             await Task.Delay(Timeout.Infinite, cancellationToken);
             return [];
+        }
+    }
+
+    /// <summary>A real SQL command that outlasts the timeout, so the cancellation has to go through SqlClient.</summary>
+    private sealed class SlowQueryCategoryService(CatalogDbContext db) : ICategoryService
+    {
+        public async Task<IReadOnlyList<CategoryDto>> ListAsync(CancellationToken cancellationToken)
+        {
+            await db.Database.ExecuteSqlRawAsync("WAITFOR DELAY '00:00:30'", cancellationToken);
+            return [];
+        }
+    }
+
+    /// <summary>Saves, but only after the request timeout has passed.</summary>
+    private sealed class SlowUnitOfWork(CatalogDbContext db) : IUnitOfWork
+    {
+        public async Task SaveChangesAsync(CancellationToken cancellationToken)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 }

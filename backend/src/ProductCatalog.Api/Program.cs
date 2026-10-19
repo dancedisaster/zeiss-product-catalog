@@ -34,6 +34,7 @@ app.UseSecurityHeaders();
 app.UseCors(ApiServiceCollectionExtensions.FrontendCorsPolicy);
 app.UseRateLimiter();
 app.UseRequestTimeouts();
+app.UseRequestCancellation();
 
 if (app.Environment.IsDevelopment())
 {
