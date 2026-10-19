@@ -9,6 +9,7 @@ CRUD and stock operations (ASP.NET Core 10, EF Core 10, SQL Server) and an Angul
 | **Frontend** | Angular 22 (standalone, zoneless, signals, Signal Forms, `httpResource`), SCSS with BEM, mobile first |
 | **Tests** | xUnit + NSubstitute (unit), Testcontainers + WebApplicationFactory (integration), Reqnroll (BDD), Vitest (Angular) |
 | **Run** | Docker Compose (SQL Server + API + nginx-served UI) |
+| **CI** | GitHub Actions on every push and pull request: build, all tests and the Docker quick start ([see Tests](#tests)) |
 
 ## Quick start (Docker)
 
@@ -92,8 +93,8 @@ cd frontend
 npm test -- --watch=false
 ```
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs all of this on every push to `main` and every pull
-request, in three parallel jobs:
+CI in GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs all of this on every push to `main`
+and every pull request, in three parallel jobs:
 - **Backend:** formatting, a Release build in which warnings are errors, then the unit, integration and BDD tests
   against SQL Server in Docker.
 - **Frontend:** Prettier, the tests and the production build.
