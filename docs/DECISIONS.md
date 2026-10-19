@@ -122,8 +122,9 @@ case-insensitive search or CHECK constraints the same way, so they would test a 
 `ProductStore` keeps state in signals and exposes `computed` slices (list, status, KPIs). Filter changes go through
 RxJS (`debounceTime` + `switchMap`), which cancels stale requests so an older response can never overwrite a newer one.
 Mutations write the server's response back into state (the server is the source of truth); delete is optimistic, and
-rolled back if the API refuses it. A mutation that gets no answer or a server error (a proxy timeout, a dropped
-connection) may still have been applied, so it is never rolled back on trust: the page is reloaded instead. That matters
+every outcome reloads the page and summary. Even a refused deletion must not restore an old list snapshot, which
+could undo another deletion or stock change that finished meanwhile. A mutation that gets no answer or a server error
+(a proxy timeout, a dropped connection) may still have been applied, so it is never rolled back on trust: the page is reloaded instead. That matters
 most for stock changes, where clicking again after a false failure would move the stock twice. Simple reads (`/api/categories`, product for editing) use `httpResource`, and the form model is a
 `linkedSignal` that resets when the loaded product changes. Presentational components only have inputs/outputs.
 

@@ -197,19 +197,14 @@ export class ProductStore {
   }
 
   /**
-   * Optimistic: the row disappears at once, and comes back only if the API refused the delete. If it was already
-   * deleted elsewhere (404), or the outcome is unknown, the page is reloaded instead.
+   * Optimistic: the row disappears at once. Every outcome reloads the page from the server;
+   * restoring an old list snapshot could undo another deletion or stock change that finished meanwhile.
    */
   async remove(product: Product): Promise<MutationResult> {
-    const previous = this.state().products;
     this.patchProducts((products) => products.filter((p) => p.id !== product.id));
 
     const result = await this.run(this.api.delete(product.id));
-    if (result.ok || result.error.status === 404 || isOutcomeUnknown(result.error)) {
-      this.refresh(); // the next product moves up into this page, and the total and summary change
-    } else {
-      this.patchProducts(() => previous);
-    }
+    this.refresh(); // reconcile the page, total and summary without restoring stale rows
     return result.ok ? { ok: true, value: undefined } : result;
   }
 

@@ -286,7 +286,7 @@ describe('ProductStore', () => {
     expect(store.total()).toBe(11);
   });
 
-  it('restores a removed product when the API refuses', async () => {
+  it('reloads a refused deletion and restores the product from the server', async () => {
     const target = store.products()[0];
     const pending = store.remove(target);
 
@@ -296,7 +296,32 @@ describe('ProductStore', () => {
     const result = await pending;
 
     expect(result.ok).toBe(false);
+    expect(store.products().some((p) => p.id === target.id)).toBe(false);
+    respond('/api/products', [target, product({ id: 100002, stock: 0, sku: 'LNS-2' })], 12);
     expect(store.products().some((p) => p.id === target.id)).toBe(true);
+  });
+
+  it('does not resurrect another deleted product when an overlapping deletion receives 429', async () => {
+    const [first, second] = store.products();
+    const firstDelete = store.remove(first);
+    const secondDelete = store.remove(second);
+
+    http
+      .expectOne({ method: 'DELETE', url: `/api/products/${second.id}` })
+      .flush(null, { status: 204, statusText: 'No Content' });
+    expect((await secondDelete).ok).toBe(true);
+    respond('/api/products', [first], 11);
+
+    http
+      .expectOne({ method: 'DELETE', url: `/api/products/${first.id}` })
+      .flush({ detail: 'Too many requests' }, { status: 429, statusText: 'Too Many Requests' });
+    expect((await firstDelete).ok).toBe(false);
+
+    // A rollback of the first deletion's snapshot would bring the second product back here.
+    expect(store.products().some((p) => p.id === second.id)).toBe(false);
+    respond('/api/products', [first], 11);
+    expect(store.products()).toEqual([first]);
+    expect(store.total()).toBe(11);
   });
 
   it('does not restore a product that was already deleted elsewhere', async () => {
