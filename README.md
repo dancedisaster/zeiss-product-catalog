@@ -92,6 +92,14 @@ cd frontend
 npm test -- --watch=false
 ```
 
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs all of this on every push to `main` and every pull
+request, in three parallel jobs:
+- **Backend:** formatting, a Release build in which warnings are errors, then the unit, integration and BDD tests
+  against SQL Server in Docker.
+- **Frontend:** Prettier, the tests and the production build.
+- **Quick start:** `docker compose up --build`, then the API, the UI, the product list through nginx and the CSV export
+  must answer.
+
 | Suite | What it covers |
 |---|---|
 | `ProductCatalog.UnitTests` (74) | Domain invariants, validators (including missing fields), every branch of `ProductService` with mocked ports, paging and sorting parameters, export filters and default order |
@@ -189,5 +197,5 @@ My part was to steer and check the work:
 - Indexes on `Name` and `Price` for sorting, and keyset (cursor) paging, once the catalogue grows large.
 - Real-time updates with SignalR instead of focus/interval refresh.
 - Bulk selection and bulk actions, with bulk endpoints that define what happens when some items fail.
-- OpenTelemetry traces/metrics to Azure Monitor; CI pipeline (build, test, `dotnet ef migrations bundle`, container scan) in Azure DevOps; deploy to AKS / Container Apps.
+- OpenTelemetry traces/metrics to Azure Monitor; extend CI into delivery (the same pipeline in Azure DevOps, `dotnet ef migrations bundle`, image scan and push to Azure Container Registry) and deploy to AKS / Container Apps.
 - Playwright end-to-end tests in CI.
